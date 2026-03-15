@@ -195,13 +195,14 @@
 
     // --- Main App ---
     function App() {
-      const [view, setView] = useState('home');
       const [apiKey, setApiKey] = useState('');
+      const [showApiModal, setShowApiModal] = useState(false);
+      const [pendingAction, setPendingAction] = useState(null);
       const [slides, setSlides] = useState([{ id: Date.now(), imageFile: null, preview: null, script: '', voice: 'Kore', audioUrl: null }]);
       const [globalVoice, setGlobalVoice] = useState('Kore');
       const [playingAudio, setPlayingAudio] = useState(null);
       const [previewLoading, setPreviewLoading] = useState(false);
-      const [progress, setProgress] = useState(null); // { step: number, percent: number, msg: string }
+      const [progress, setProgress] = useState(null);
       const [finalVideo, setFinalVideo] = useState(null);
       const fileInputRef = useRef(null);
 
@@ -216,52 +217,77 @@
         e.target.value = '';
       };
 
-      const generateAIContent = async () => {
-        setProgress({ step: 2, percent: 0, msg: 'Initializing AI generation...' });
+      const handleActionWithApi = (actionFn) => {
+        if (!apiKey) {
+          setPendingAction(() => actionFn);
+          setShowApiModal(true);
+        } else {
+          actionFn();
+        }
+      };
+
+      const runBulkScripts = async () => {
+        setProgress({ step: 2, percent: 0, msg: 'Generating scripts...' });
         let done = 0;
-        const toProcess = slides.filter(s => s.imageFile && (!s.script || !s.audioUrl));
-        
+        const toProcess = slides.filter(s => s.imageFile && !s.script);
         for (const slide of toProcess) {
           try {
-            let script = slide.script;
-            if (!script) {
-              updateSlide(slide.id, { isGenerating: true });
-              const b64 = await fileToBase64(slide.imageFile);
-              const data = await fetchGemini('gemini-1.5-flash', {
-                contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
-              }, apiKey);
-              script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-              if (!script) throw new Error("Gemini failed to generate a script. Check your image format or API quotas.");
-              updateSlide(slide.id, { script });
-            }
-
-            if (script && !slide.audioUrl) {
-              const data = await fetchGemini('gemini-2.0-flash', {
-                contents: [{ parts: [{ text: script }] }],
-                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
-              }, apiKey);
-              const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-              if (part) {
-                const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
-                updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
-              } else {
-                throw new Error("Failed to generate audio track.");
-              }
-            }
+            updateSlide(slide.id, { isGenerating: true });
+            const b64 = await fileToBase64(slide.imageFile);
+            const data = await fetchGemini('gemini-1.5-flash', {
+              contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
+            }, apiKey);
+            const script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (!script) throw new Error("Gemini failed to generate a script.");
+            updateSlide(slide.id, { script });
           } catch (e) {
             console.error(e);
-            alert(`Error on Slide ${idx + 1} (${e.model || 'API'}): ${e.message}. Please check your API key / region.`);
+            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
           } finally {
             updateSlide(slide.id, { isGenerating: false });
             done++;
-            setProgress(p => ({ ...p, percent: Math.round((done / toProcess.length) * 100), msg: `Processed ${done}/${toProcess.length} slides` }));
+            setProgress(p => ({ ...p, percent: Math.round((done / toProcess.length) * 100), msg: `Processed ${done}/${toProcess.length} scripts` }));
+          }
+        }
+        setTimeout(() => setProgress(null), 2000);
+      };
+
+      const runBulkVoiceovers = async () => {
+        setProgress({ step: 3, percent: 0, msg: 'Generating voiceovers...' });
+        let done = 0;
+        const toProcess = slides.filter(s => s.script && !s.audioUrl);
+        for (const slide of toProcess) {
+          try {
+            updateSlide(slide.id, { isGeneratingVoice: true });
+            const data = await fetchGemini('gemini-2.0-flash', {
+              contents: [{ parts: [{ text: slide.script }] }],
+              generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice || globalVoice } } } }
+            }, apiKey);
+            const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+            if (part) {
+              const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
+              updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
+            } else {
+              throw new Error("Failed to generate audio track.");
+            }
+          } catch (e) {
+            console.error(e);
+            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
+          } finally {
+            updateSlide(slide.id, { isGeneratingVoice: false });
+            done++;
+            setProgress(p => ({ ...p, percent: Math.round((done / toProcess.length) * 100), msg: `Processed ${done}/${toProcess.length} voices` }));
           }
         }
         setTimeout(() => setProgress(null), 2000);
       };
 
       const generateSlideAudio = async (slide) => {
-        if (!apiKey) return alert("Please enter your Gemini API Key first.");
+        if (!apiKey) {
+          setPendingAction(() => () => generateSlideAudio(slide));
+          setShowApiModal(true);
+          return;
+        }
         if (!slide.script) return alert("Please write or generate a script first.");
         try {
           updateSlide(slide.id, { isGenerating: true });
@@ -285,7 +311,7 @@
       };
 
       const compileVideo = async () => {
-        setProgress({ step: 3, percent: 0, msg: 'Preparing compiler...' });
+        setProgress({ step: 4, percent: 0, msg: 'Preparing compiler...' });
         try {
           const { Muxer, ArrayBufferTarget } = window.WebMMuxer;
           const canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 720;
@@ -388,30 +414,6 @@
         }
       };
 
-      if (view === 'home') {
-        return (
-          <div className="min-h-screen flex items-center justify-center p-6">
-            <div className="max-w-md w-full glass rounded-3xl p-8 border border-white/20 shadow-2xl text-center">
-              <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl"><Star className="text-white w-10 h-10" /></div>
-              <h1 className="text-3xl font-extrabold text-slate-900 mb-2">AI Voice-Over-Slides</h1>
-              <p className="text-slate-600 mb-2 text-sm font-bold text-indigo-600">by TooLabX</p>
-              <p className="text-slate-600 mb-8 text-sm">Turn your presentation slides into AI-narrated videos effortlessly.</p>
-              <div className="text-left mb-6">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Gemini API Key</label>
-                <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="AIzaSy..." className="w-full bg-white/50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                <p className="mt-2 text-xs text-slate-500 text-right">
-                  Get your free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-bold">Google AI Studio</a>
-                </p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <button onClick={() => setView('app')} disabled={!apiKey} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95">Get Started</button>
-                <button onClick={() => setView('app')} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition-all active:scale-95 text-sm">Continue without API Key</button>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
       return (
         <div className="min-h-screen flex flex-col">
           <header className="glass sticky top-0 z-20 border-b border-slate-200/50 px-8 py-4 flex justify-between items-center">
@@ -419,43 +421,51 @@
               <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center"><Video className="text-white w-6 h-6" /></div>
               <h1 className="text-xl font-black text-slate-900 uppercase tracking-tighter">AI Voice-Over-Slides</h1>
             </div>
-            <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
-              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Global Voice:</span>
-              <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="bg-transparent text-sm font-bold outline-none cursor-pointer">
-                {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-              <div className="w-px h-6 bg-slate-200 mx-2"></div>
-              {previewLoading ? (
-                <Loader className="w-5 h-5 text-indigo-500 animate-spin" />
-              ) : playingAudio ? (
-                <button onClick={() => { playingAudio.pause(); setPlayingAudio(null); }} className="flex items-center gap-2 text-xs font-black bg-red-100 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-all uppercase"><Icon path='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' className="w-3 h-3"/> STOP</button>
-              ) : (
-                <button onClick={() => previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading)} className="flex items-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW</button>
-              )}
-            </div>
+            {!apiKey ? (
+              <button onClick={() => setShowApiModal(true)} className="flex items-center gap-2 text-xs font-black bg-slate-100 text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-200 transition-all uppercase"><Settings className="w-4 h-4"/> Set API Key</button>
+            ) : (
+              <div className="text-xs font-black bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg uppercase">API KEY ACTIVE</div>
+            )}
           </header>
 
-          <main className="flex-1 max-w-5xl mx-auto w-full p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <main className="flex-1 max-w-6xl mx-auto w-full p-8 md:p-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
               {[
-                { s: 1, t: "Upload", d: "Bulk upload images", i: <Upload />, a: () => fileInputRef.current.click() },
-                { s: 2, t: "AI Generate", d: "Scripts & Voiceovers", i: <Star />, a: generateAIContent, p: progress?.step === 2 },
-                { s: 3, t: "Compile", d: "Export WebM Video", i: <Video />, a: compileVideo, p: progress?.step === 3, primary: true }
+                { s: 1, t: "1. Upload", d: "Bulk upload images", i: <Upload />, a: () => fileInputRef.current.click() },
+                { s: 2, t: "2. Scripts", d: "Generate text logic", i: <Star />, a: () => handleActionWithApi(runBulkScripts), p: progress?.step === 2 },
+                { s: 3, t: "3. Voiceovers", d: "Generate speech", i: <Mic />, a: () => handleActionWithApi(runBulkVoiceovers), p: progress?.step === 3, 
+                  extra: (
+                    <div className="mt-4 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                      <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer">
+                        {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                      {previewLoading ? (
+                        <div className="flex justify-center p-2"><Loader className="w-4 h-4 text-indigo-500 animate-spin" /></div>
+                      ) : playingAudio ? (
+                        <button onClick={() => { playingAudio.pause(); setPlayingAudio(null); }} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-red-100 text-red-600 px-3 py-2 rounded-lg hover:bg-red-200 transition-all uppercase"><Icon path='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' className="w-3 h-3"/> STOP PREVIEW</button>
+                      ) : (
+                        <button onClick={() => { if(!apiKey) { setShowApiModal(true); return; } previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading); }} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW VOICE</button>
+                      )}
+                    </div>
+                  )
+                },
+                { s: 4, t: "4. Compile", d: "Export WebM Video", i: <Video />, a: compileVideo, p: progress?.step === 4, primary: true }
               ].map(step => (
-                <div key={step.s} className={`p-6 rounded-2xl border transition-all ${step.primary ? 'bg-indigo-600 border-indigo-500 shadow-indigo-200 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'}`}>
+                <div key={step.s} className={`p-6 rounded-3xl border transition-all flex flex-col ${step.primary ? 'bg-indigo-600 border-indigo-500 shadow-indigo-200 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'}`}>
                   <div className="flex justify-between items-center mb-4"><span className={`text-xs font-black px-2 py-1 rounded ${step.primary ? 'bg-white/20' : 'bg-indigo-100 text-indigo-700'}`}>STEP {step.s}</span>{step.i}</div>
                   <h3 className="font-black text-lg mb-1">{step.t}</h3>
-                  <p className={`text-xs mb-6 ${step.primary ? 'text-white/70' : 'text-slate-500'}`}>{step.d}</p>
-                  <button onClick={step.a} disabled={progress} className={`w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 ${step.primary ? 'bg-white text-indigo-600 hover:bg-white/90 disabled:bg-white/50' : 'bg-slate-100 hover:bg-slate-200 disabled:opacity-50'}`}>
-                    {step.p ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : step.t}
+                  <p className={`text-xs mb-6 flex-1 ${step.primary ? 'text-white/70' : 'text-slate-500'}`}>{step.d}</p>
+                  <button onClick={step.a} disabled={progress !== null && progress.step !== step.s} className={`w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 ${step.primary ? 'bg-white text-indigo-600 hover:bg-white/90 disabled:bg-white/50' : 'bg-slate-100 hover:bg-slate-200 disabled:opacity-50'}`}>
+                    {step.p ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : (step.primary ? "START EXPORT" : "START")}
                   </button>
+                  {step.extra}
                   {step.p && (
-                    <div className="mt-6">
+                    <div className="mt-4">
                       <div className="flex justify-between items-end mb-2">
-                        <span className={`text-xs font-bold ${step.primary ? 'text-white' : 'text-indigo-600'}`}>{progress.msg}</span>
-                        <span className={`text-xs font-black ${step.primary ? 'text-white/80' : 'text-slate-400'}`}>{progress.percent}%</span>
+                        <span className={`text-[10px] font-bold ${step.primary ? 'text-white' : 'text-indigo-600'}`}>{progress.msg}</span>
+                        <span className={`text-[10px] font-black ${step.primary ? 'text-white/80' : 'text-slate-400'}`}>{progress.percent}%</span>
                       </div>
-                      <div className={`h-2 rounded-full overflow-hidden ${step.primary ? 'bg-black/20' : 'bg-slate-100'}`}>
+                      <div className={`h-1.5 rounded-full overflow-hidden ${step.primary ? 'bg-black/20' : 'bg-slate-100'}`}>
                         <div className={`h-full transition-all duration-300 ease-out ${step.primary ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${progress.percent}%` }} />
                       </div>
                     </div>
@@ -518,6 +528,20 @@
                     <button onClick={() => setFinalVideo(null)} className="px-8 py-4 font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-all uppercase text-xs">Edit More</button>
                     <a href={finalVideo} download="TooLabX_Video.webm" className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:scale-105 transition-all flex items-center gap-3 uppercase text-xs tracking-widest"><Download className="w-5 h-5" /> Download Export</a>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showApiModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-2xl animate-in zoom-in duration-200">
+                <h2 className="text-2xl font-black text-slate-900 mb-2">API Key Required</h2>
+                <p className="text-sm text-slate-500 mb-6">To automatically generate scripts or AI voiceovers, you need a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 hover:underline font-bold">Google AI Studio</a>.</p>
+                <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste your API key here..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-6" />
+                <div className="flex flex-col gap-3">
+                  <button onClick={() => { setShowApiModal(false); if(pendingAction) pendingAction(); }} disabled={!apiKey} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl disabled:bg-slate-300 hover:bg-indigo-700 transition-all">Save & Continue</button>
+                  <button onClick={() => setShowApiModal(false)} className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200 transition-all text-sm">Close and Continue Manually</button>
                 </div>
               </div>
             </div>
