@@ -52,8 +52,8 @@
       if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
       try {
         setPreviewLoading(true);
-        console.log(`Previewing voice: ${voiceName} using gemini-2.0-flash...`);
-        const data = await fetchGemini('gemini-2.0-flash', {
+        console.log(`Previewing voice: ${voiceName} using gemini-2.0-flash-exp...`);
+        const data = await fetchGemini('gemini-2.0-flash-exp', {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -129,17 +129,7 @@
         let errMsg = `API Error ${res.status}`;
         try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
         
-        // Auto-fallback system for model 404 unavailability
-        if (res.status === 404) {
-           if (endpoint === 'gemini-1.5-flash') {
-               console.warn("404 on flash, falling back to gemini-1.5-pro...");
-               return fetchGemini('gemini-1.5-pro', payload, key);
-           }
-           if (endpoint === 'gemini-2.0-flash') {
-               console.warn("404 on 2.0-flash, falling back to gemini-2.0-flash-exp...");
-               return fetchGemini('gemini-2.0-flash-exp', payload, key);
-           }
-        }
+        // Auto-fallback system removed; endpoints should exactly specify capabilities
 
         const error = new Error(errMsg);
         error.status = res.status;
@@ -234,7 +224,7 @@
           try {
             updateSlide(slide.id, { isGenerating: true });
             const b64 = await fileToBase64(slide.imageFile);
-            const data = await fetchGemini('gemini-1.5-flash', {
+            const data = await fetchGemini('gemini-2.0-flash', {
               contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
             }, apiKey);
             const script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -259,7 +249,7 @@
         for (const slide of toProcess) {
           try {
             updateSlide(slide.id, { isGeneratingVoice: true });
-            const data = await fetchGemini('gemini-2.0-flash', {
+            const data = await fetchGemini('gemini-2.0-flash-exp', {
               contents: [{ parts: [{ text: slide.script }] }],
               generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice || globalVoice } } } }
             }, apiKey);
@@ -291,7 +281,7 @@
         if (!slide.script) return alert("Please write or generate a script first.");
         try {
           updateSlide(slide.id, { isGenerating: true });
-          const data = await fetchGemini('gemini-2.0-flash', {
+          const data = await fetchGemini('gemini-2.0-flash-exp', {
             contents: [{ parts: [{ text: slide.script }] }],
             generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
           }, apiKey);
