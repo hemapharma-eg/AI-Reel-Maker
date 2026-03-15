@@ -222,14 +222,30 @@
         e.target.value = '';
       };
 
-      const handleActionWithApi = (actionFn) => {
+      const executePendingAction = () => {
+        if (!pendingAction) return;
+        if (pendingAction.type === 'scripts') runBulkScripts();
+        if (pendingAction.type === 'voiceovers') runBulkVoiceovers();
+        if (pendingAction.type === 'slideAudio') generateSlideAudio(pendingAction.payload);
+        if (pendingAction.type === 'preview') previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading);
+        setPendingAction(null);
+      };
+
+      const handleActionWithApi = (type, payload = null) => {
         if (!apiKey) {
-          setPendingAction(() => actionFn);
+          setPendingAction({ type, payload });
           setShowApiModal(true);
         } else {
-          actionFn();
+          setPendingAction({ type, payload });
+          // We need to run it in next tick so pending action resolves, or just run directly
         }
       };
+      
+      useEffect(() => {
+        if (apiKey && pendingAction && !showApiModal) {
+          executePendingAction();
+        }
+      }, [apiKey, pendingAction, showApiModal]);
 
       const runBulkScripts = async () => {
         setProgress({ step: 2, percent: 0, msg: 'Generating scripts...' });
@@ -289,7 +305,7 @@
 
       const generateSlideAudio = async (slide) => {
         if (!apiKey) {
-          setPendingAction(() => () => generateSlideAudio(slide));
+          setPendingAction({ type: 'slideAudio', payload: slide });
           setShowApiModal(true);
           return;
         }
@@ -437,8 +453,8 @@
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
               {[
                 { s: 1, t: "1. Upload", d: "Bulk upload images", i: <Upload />, a: () => fileInputRef.current.click() },
-                { s: 2, t: "2. Scripts", d: "Generate text logic", i: <Star />, a: () => handleActionWithApi(runBulkScripts), p: progress?.step === 2 },
-                { s: 3, t: "3. Voiceovers", d: "Generate speech", i: <Mic />, a: () => handleActionWithApi(runBulkVoiceovers), p: progress?.step === 3, 
+                { s: 2, t: "2. Scripts", d: "Generate text logic", i: <Star />, a: () => handleActionWithApi('scripts'), p: progress?.step === 2 },
+                { s: 3, t: "3. Voiceovers", d: "Generate speech", i: <Mic />, a: () => handleActionWithApi('voiceovers'), p: progress?.step === 3, 
                   extra: (
                     <div className="mt-4 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
                       <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer">
@@ -449,7 +465,7 @@
                       ) : playingAudio ? (
                         <button onClick={() => { playingAudio.pause(); setPlayingAudio(null); }} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-red-100 text-red-600 px-3 py-2 rounded-lg hover:bg-red-200 transition-all uppercase"><Icon path='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' className="w-3 h-3"/> STOP PREVIEW</button>
                       ) : (
-                        <button onClick={() => { if(!apiKey) { setShowApiModal(true); return; } previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading); }} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW VOICE</button>
+                        <button onClick={() => handleActionWithApi('preview')} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW VOICE</button>
                       )}
                     </div>
                   )
@@ -545,8 +561,8 @@
                 <p className="text-sm text-slate-500 mb-6">To automatically generate scripts or AI voiceovers, you need a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 hover:underline font-bold">Google AI Studio</a>.</p>
                 <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste your API key here..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-6" />
                 <div className="flex flex-col gap-3">
-                  <button onClick={() => { setShowApiModal(false); if(pendingAction) pendingAction(); }} disabled={!apiKey} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl disabled:bg-slate-300 hover:bg-indigo-700 transition-all">Save & Continue</button>
-                  <button onClick={() => setShowApiModal(false)} className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200 transition-all text-sm">Close and Continue Manually</button>
+                  <button onClick={() => setShowApiModal(false)} disabled={!apiKey} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl disabled:bg-slate-300 hover:bg-indigo-700 transition-all">Save & Continue</button>
+                  <button onClick={() => { setPendingAction(null); setShowApiModal(false); }} className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200 transition-all text-sm">Close and Continue Manually</button>
                 </div>
               </div>
             </div>
