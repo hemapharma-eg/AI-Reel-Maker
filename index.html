@@ -47,6 +47,31 @@
       "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"
     ];
 
+    const previewVoice = async (voiceName, apiKey, setPlayingAudio, setPreviewLoading) => {
+      if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
+      try {
+        setPreviewLoading(true);
+        const data = await fetchGemini('gemini-2.5-flash-preview-tts', {
+          contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
+          generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
+        }, apiKey);
+        
+        const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        if (part) {
+          const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
+          const audio = new Audio(URL.createObjectURL(blob));
+          setPlayingAudio(audio);
+          audio.play();
+          audio.onended = () => setPlayingAudio(null);
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Failed to load voice preview.");
+      } finally {
+        setPreviewLoading(false);
+      }
+    };
+
     function base64ToWav(base64, sampleRate = 24000) {
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
@@ -144,6 +169,8 @@
       const [apiKey, setApiKey] = useState('');
       const [slides, setSlides] = useState([{ id: Date.now(), imageFile: null, preview: null, script: '', voice: 'Kore', audioUrl: null }]);
       const [globalVoice, setGlobalVoice] = useState('Kore');
+      const [playingAudio, setPlayingAudio] = useState(null);
+      const [previewLoading, setPreviewLoading] = useState(false);
       const [progress, setProgress] = useState(null); // { step: number, percent: number, msg: string }
       const [finalVideo, setFinalVideo] = useState(null);
       const fileInputRef = useRef(null);
@@ -301,10 +328,19 @@
               <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center"><Video className="text-white w-6 h-6" /></div>
               <h1 className="text-xl font-black text-slate-900 uppercase tracking-tighter">AI Voice-Over-Slides</h1>
             </div>
-            <div className="flex items-center gap-4">
-              <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="bg-white border text-sm font-bold p-2 rounded-lg outline-none">
+            <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Global Voice:</span>
+              <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="bg-transparent text-sm font-bold outline-none cursor-pointer">
                 {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
+              <div className="w-px h-6 bg-slate-200 mx-2"></div>
+              {previewLoading ? (
+                <Loader className="w-5 h-5 text-indigo-500 animate-spin" />
+              ) : playingAudio ? (
+                <button onClick={() => { playingAudio.pause(); setPlayingAudio(null); }} className="flex items-center gap-2 text-xs font-black bg-red-100 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-all uppercase"><Icon path='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' className="w-3 h-3"/> STOP</button>
+              ) : (
+                <button onClick={() => previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading)} className="flex items-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW</button>
+              )}
             </div>
           </header>
 
@@ -319,10 +355,20 @@
                   <div className="flex justify-between items-center mb-4"><span className={`text-xs font-black px-2 py-1 rounded ${step.primary ? 'bg-white/20' : 'bg-indigo-100 text-indigo-700'}`}>STEP {step.s}</span>{step.i}</div>
                   <h3 className="font-black text-lg mb-1">{step.t}</h3>
                   <p className={`text-xs mb-6 ${step.primary ? 'text-white/70' : 'text-slate-500'}`}>{step.d}</p>
-                  <button onClick={step.a} disabled={progress} className={`w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 ${step.primary ? 'bg-white text-indigo-600' : 'bg-slate-100 hover:bg-slate-200'}`}>
+                  <button onClick={step.a} disabled={progress} className={`w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 ${step.primary ? 'bg-white text-indigo-600 hover:bg-white/90 disabled:bg-white/50' : 'bg-slate-100 hover:bg-slate-200 disabled:opacity-50'}`}>
                     {step.p ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : step.t}
                   </button>
-                  {step.p && <div className="mt-4 h-1.5 bg-black/10 rounded-full overflow-hidden"><div className="h-full bg-white transition-all" style={{ width: `${progress.percent}%` }} /></div>}
+                  {step.p && (
+                    <div className="mt-6">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className={`text-xs font-bold ${step.primary ? 'text-white' : 'text-indigo-600'}`}>{progress.msg}</span>
+                        <span className={`text-xs font-black ${step.primary ? 'text-white/80' : 'text-slate-400'}`}>{progress.percent}%</span>
+                      </div>
+                      <div className={`h-2 rounded-full overflow-hidden ${step.primary ? 'bg-black/20' : 'bg-slate-100'}`}>
+                        <div className={`h-full transition-all duration-300 ease-out ${step.primary ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${progress.percent}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
