@@ -299,7 +299,10 @@
             let dur = 3000;
             let buf = null;
             if (s.audioBlob) {
-              buf = await audioCtx.decodeAudioData(await s.audioBlob.arrayBuffer());
+              console.log(`Decoding slide ${i+1} audio... Blob size:`, s.audioBlob.size);
+              const ab = await s.audioBlob.arrayBuffer();
+              buf = await audioCtx.decodeAudioData(ab);
+              console.log(`Slide ${i+1} audio decoded. Duration:`, buf.duration);
               dur = Math.max(buf.duration * 1000, 500);
             }
             const res = { img, sentences: s.script ? s.script.split(/(?<=[.!?])\s+/).filter(Boolean).map(x => x.trim()) : [], duration: dur, start: totalMs, buffer: buf };
@@ -310,19 +313,22 @@
           const fps = 30; const totalFrames = Math.ceil((totalMs / 1000) * fps);
           const sampleRate = 48000;
           const offlineCtx = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
-          visuals.forEach(v => {
+          visuals.forEach((v, i) => {
             if (v.buffer) {
+              console.log(`Scheduling slide ${i+1} audio at start time:`, v.start / 1000);
               const src = offlineCtx.createBufferSource(); src.buffer = v.buffer;
               src.connect(offlineCtx.destination); src.start(v.start / 1000);
             }
           });
+          console.log("Starting offline rendering...");
           const renderedAudio = await offlineCtx.startRendering();
           const audioData = renderedAudio.getChannelData(0);
+          console.log("Offline rendering complete. Audio samples:", audioData.length);
 
           const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'V_VP8', width: 1280, height: 720, framerate: fps }, audio: { codec: 'A_OPUS', sampleRate, numberOfChannels: 1 } });
           const vEnc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => console.error('VideoEncoder error:', e) });
           vEnc.configure({ codec: 'vp8', width: 1280, height: 720, bitrate: 2e6 });
-          const aEnc = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => console.error('AudioEncoder error:', e) });
+          const aEnc = new AudioEncoder({ output: (c, m) => { console.log("Muxer received audio chunk"); muxer.addAudioChunk(c, m); }, error: e => console.error('AudioEncoder error:', e) });
           aEnc.configure({ codec: 'opus', sampleRate, numberOfChannels: 1, bitrate: 128000 });
 
           // Interleaved encoding
