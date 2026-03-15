@@ -3,43 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Voice-Over-Slides by TooLabX</title>
+  <title>SlideCaster - AI Voice-Over-Slides</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/webm-muxer@5.0.2/build/webm-muxer.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide-react@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
-    @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .animate-spin-slow { animation: spin-slow 3s linear infinite; }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoom-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .animate-in { animation: var(--anim-name) var(--anim-duration) ease-out; }
+    .fade-in { --anim-name: fade-in; --anim-duration: 300ms; }
+    .zoom-in { --anim-name: zoom-in; --anim-duration: 300ms; }
   </style>
 </head>
 <body class="bg-gray-50">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useRef, useEffect, useCallback, useMemo } = React;
+    const { useState, useRef, useEffect } = React;
+    const { 
+      Play, 
+      Video, 
+      Plus, 
+      Trash2, 
+      Presentation, 
+      Mic, 
+      Download, 
+      Loader2, 
+      Upload,
+      Settings,
+      Sparkles
+    } = LucideReact;
 
-    // --- Icons ---
-    const Icon = ({ path, className, ...props }) => (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} dangerouslySetInnerHTML={{__html: path}} {...props} />
-    );
-    const Play = (props) => <Icon path='<polygon points="5 3 19 12 5 21 5 3"/>' {...props} />;
-    const Video = (props) => <Icon path='<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>' {...props} />;
-    const Plus = (props) => <Icon path='<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>' {...props} />;
-    const Trash = (props) => <Icon path='<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' {...props} />;
-    const Monitor = (props) => <Icon path='<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' {...props} />;
-    const Mic = (props) => <Icon path='<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>' {...props} />;
-    const Download = (props) => <Icon path='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' {...props} />;
-    const Loader = (props) => <Icon path='<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>' {...props} />;
-    const Upload = (props) => <Icon path='<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>' {...props} />;
-    const Settings = (props) => <Icon path='<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>' {...props} />;
-    const Star = (props) => <Icon path='<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' {...props} />;
+    const apiKey = ""; // Will be provided by environment
 
-    // --- Config & Utils ---
     const VOICES = [
       "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", 
       "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", 
@@ -48,535 +49,810 @@
       "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"
     ];
 
-    const previewVoice = async (voiceName, apiKey, setPlayingAudio, setPreviewLoading) => {
-      if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
-      try {
-        setPreviewLoading(true);
-        console.log(`Previewing voice: ${voiceName}...`);
-        const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'], {
-          contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
-          generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
-        }, apiKey);
-        
-        const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-        if (part) {
-          const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
-          const audio = new Audio(URL.createObjectURL(blob));
-          setPlayingAudio(audio);
-          audio.play();
-          audio.onended = () => setPlayingAudio(null);
-        } else {
-          throw new Error("No audio data in response. Gemini 2.0 might not be available in your region with this API key.");
-        }
-      } catch (e) {
-        console.error("Preview error:", e);
-        alert(`Failed to load voice preview (${e.model || 'API'}): ${e.message || "Unknown error"}. Check console for details.`);
-      } finally {
-        setPreviewLoading(false);
-      }
-    };
-
+    // Utility: Convert raw PCM Base64 to WAV Blob
     function base64ToWav(base64, sampleRate = 24000) {
       const binaryString = atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-      
-      // If it's already a WAV/container format (starts with RIFF), return as is
-      if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
-        return new Blob([bytes], { type: 'audio/wav' });
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
+      const buffer = bytes.buffer; 
 
-      const wavBuffer = new ArrayBuffer(44 + bytes.byteLength);
+      const wavBuffer = new ArrayBuffer(44 + buffer.byteLength);
       const view = new DataView(wavBuffer);
-      const writeString = (v, offset, str) => { for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i)); };
+
+      const writeString = (v, offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          v.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+
+      const numChannels = 1;
+      const byteRate = sampleRate * numChannels * 2;
+      const blockAlign = numChannels * 2;
 
       writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + bytes.byteLength, true);
+      view.setUint32(4, 36 + buffer.byteLength, true);
       writeString(view, 8, 'WAVE');
       writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true); // Mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
+      view.setUint32(16, 16, true); // Subchunk1Size
+      view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+      view.setUint16(22, numChannels, true); // NumChannels
+      view.setUint32(24, sampleRate, true); // SampleRate
+      view.setUint32(28, byteRate, true); // ByteRate
+      view.setUint16(32, blockAlign, true); // BlockAlign
+      view.setUint16(34, 16, true); // BitsPerSample
       writeString(view, 36, 'data');
-      view.setUint32(40, bytes.byteLength, true);
-      new Uint8Array(wavBuffer, 44).set(bytes);
+      view.setUint32(40, buffer.byteLength, true); // Subchunk2Size
+
+      new Uint8Array(wavBuffer, 44).set(new Uint8Array(buffer));
+
       return new Blob([wavBuffer], { type: 'audio/wav' });
     }
 
-    const fileToBase64 = (file) => new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    // API Call for TTS
+    async function generateTTS(text, voiceName, userApiKey, retries = 3) {
+      // NOTE: Using userApiKey instead of the empty global apiKey
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${userApiKey}`;
+      const payload = {
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName }
+            }
+          }
+        }
+      };
 
-    async function fetchGemini(models, payload, key) {
-      const modelArray = Array.isArray(models) ? models : [models];
-      let lastError;
-
-      for (let i = 0; i < modelArray.length; i++) {
-        const endpoint = modelArray[i];
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent`;
-        console.log(`Fetching Gemini (${endpoint})...`);
+      let delay = 1000;
+      for (let i = 0; i < retries; i++) {
         try {
           const res = await fetch(url, {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': (key || '').trim()
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
           
-          if (!res.ok) {
-            let errMsg = `API Error ${res.status}`;
-            try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
-            const error = new Error(errMsg);
-            error.status = res.status;
-            error.model = endpoint;
-            throw error;
-          }
-          return await res.json();
-        } catch (e) {
-          lastError = e;
-          if (e.status === 429) {
-            console.warn(`Quota exceeded for ${endpoint}. Waiting 2s before fallback...`);
-            await new Promise(r => setTimeout(r, 2000));
-          } else {
-            console.warn(`Fallback: ${endpoint} failed (${e.status}). Trying next...`);
-          }
-          // Retry on 404 (Not Found), 429 (Quota), 500+ (Server Error)
-          if (![404, 429, 500, 503, 504].includes(e.status)) break;
+          if (!res.ok) throw new Error(`API Error: ${res.status}`);
+          const data = await res.json();
+          
+          const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (!part) throw new Error("No audio data returned");
+
+          const mimeType = part.mimeType || "audio/L16; rate=24000";
+          const rateMatch = mimeType.match(/rate=(\d+)/);
+          const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+          return base64ToWav(part.data, rate);
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
         }
       }
-      console.error("All models in waterfall failed.");
-      throw lastError;
     }
 
-    const drawSlideVisual = (ctx, w, h, slide, elapsed) => {
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, w, h);
-      const imgW = 920;
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 0, imgW, h);
+    // Utility: Convert File to Base64 for Gemini API
+    const fileToBase64 = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = error => reject(error);
+    });
 
-      if (slide.img) {
-        const scale = Math.min(imgW / slide.img.width, h / slide.img.height);
-        const iw = slide.img.width * scale;
-        const ih = slide.img.height * scale;
-        ctx.drawImage(slide.img, (imgW - iw) / 2, (h - ih) / 2, iw, ih);
-      } else {
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = 'bold 40px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(slide.text || 'Untitled Slide', imgW / 2, h / 2);
-      }
+    // Main Application Component
+    function SlideCasterApp() {
+      const [view, setView] = useState('home'); // 'home' or 'app'
+      const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
+      const [userApiKey, setUserApiKey] = useState('');
 
-      ctx.strokeStyle = '#334155'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(imgW, 0); ctx.lineTo(imgW, h); ctx.stroke();
+      const [globalVoice, setGlobalVoice] = useState("Kore");
 
-      if (slide.sentences && slide.duration > 0) {
-        const progress = Math.min(1, elapsed / slide.duration);
-        const visibleCount = Math.floor(progress * slide.sentences.length) + 1;
-        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        let curY = 40; const startX = imgW + 30; const maxW = 300;
-        slide.sentences.slice(0, visibleCount).forEach((sentence, i) => {
-          const isLast = i === visibleCount - 1;
-          ctx.fillStyle = isLast ? '#ffffff' : '#94a3b8';
-          ctx.font = (isLast ? 'bold ' : '') + '22px sans-serif';
-          const words = sentence.split(' ');
-          let line = '';
-          words.forEach(word => {
-            const test = line + word + ' ';
-            if (ctx.measureText(test).width > maxW) {
-              ctx.fillText(line, startX, curY); line = word + ' '; curY += 30;
-            } else line = test;
-          });
-          ctx.fillText(line, startX, curY); curY += 40;
-        });
-      }
-    };
+      const [slides, setSlides] = useState([
+        { 
+          id: 1, 
+          imageFile: null, 
+          imagePreviewUrl: null, 
+          script: "", 
+          audioBlob: null, 
+          audioUrl: null, 
+          isGenerating: false, 
+          voice: "Kore", // safely hardcoded fallback
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
+        }
+      ]);
+      
+      const [isCompiling, setIsCompiling] = useState(false);
+      const [compilationProgress, setCompilationProgress] = useState("");
+      const [finalVideoUrl, setFinalVideoUrl] = useState(null);
 
-    // --- Main App ---
-    function App() {
-      const [apiKey, setApiKey] = useState('');
-      const [showApiModal, setShowApiModal] = useState(false);
-      const [pendingAction, setPendingAction] = useState(null);
-      const [slides, setSlides] = useState([{ id: Date.now(), imageFile: null, preview: null, script: '', voice: 'Kore', audioUrl: null }]);
-      const [globalVoice, setGlobalVoice] = useState('Kore');
-      const [playingAudio, setPlayingAudio] = useState(null);
-      const [previewLoading, setPreviewLoading] = useState(false);
-      const [progress, setProgress] = useState(null);
-      const [finalVideo, setFinalVideo] = useState(null);
       const fileInputRef = useRef(null);
 
-      const updateSlide = (id, updates) => setSlides(s => s.map(x => x.id === id ? { ...x, ...updates } : x));
+      const handleAddSlide = () => {
+        setSlides(prev => [...prev, { 
+          id: Date.now() + Math.random(), 
+          imageFile: null, 
+          imagePreviewUrl: null, 
+          script: "", 
+          audioBlob: null, 
+          audioUrl: null, 
+          isGenerating: false,
+          voice: globalVoice,
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
+        }]);
+      };
 
-      const handleBulkUpload = (e) => {
-        const files = Array.from(e.target.files);
-        const newSlides = files.map(file => ({
-          id: Math.random(), imageFile: file, preview: URL.createObjectURL(file), script: '', voice: globalVoice, audioUrl: null
+      const handleRemoveSlide = (id) => {
+        setSlides(prev => prev.filter(s => s.id !== id));
+      };
+
+      const updateSlide = (id, updates) => {
+        setSlides(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      };
+
+      const handleImageUpload = (id, e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+          const file = files[0];
+          const previewUrl = URL.createObjectURL(file);
+          updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl });
+        }
+      };
+
+      const handleBulkImageUpload = (e) => {
+        const files = e.target.files ? Array.from(e.target.files) : [];
+        if (files.length === 0) return;
+
+        const newSlides = files.map((file, index) => ({
+          id: Date.now() + index + Math.random(),
+          imageFile: file,
+          imagePreviewUrl: URL.createObjectURL(file),
+          script: "",
+          audioBlob: null,
+          audioUrl: null,
+          isGenerating: false,
+          voice: globalVoice,
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
         }));
-        setSlides(prev => (prev.length === 1 && !prev[0].imageFile ? newSlides : [...prev, ...newSlides]));
-        e.target.value = '';
-      };
 
-      const executePendingAction = () => {
-        if (!pendingAction) return;
-        if (pendingAction.type === 'scripts') runBulkScripts();
-        if (pendingAction.type === 'voiceovers') runBulkVoiceovers();
-        if (pendingAction.type === 'slideAudio') generateSlideAudio(pendingAction.payload);
-        if (pendingAction.type === 'preview') previewVoice(globalVoice, apiKey, setPlayingAudio, setPreviewLoading);
-        setPendingAction(null);
-      };
-
-      const handleActionWithApi = (type, payload = null) => {
-        if (!apiKey) {
-          setPendingAction({ type, payload });
-          setShowApiModal(true);
-        } else {
-          setPendingAction({ type, payload });
-          // We need to run it in next tick so pending action resolves, or just run directly
-        }
-      };
-      
-      useEffect(() => {
-        if (apiKey && pendingAction && !showApiModal) {
-          executePendingAction();
-        }
-      }, [apiKey, pendingAction, showApiModal]);
-
-      const runBulkScripts = async () => {
-        setProgress({ step: 2, percent: 0, msg: 'Generating scripts...' });
-        let done = 0;
-        const toProcess = slides.filter(s => s.imageFile && !s.script);
-        for (const slide of toProcess) {
-          try {
-            updateSlide(slide.id, { isGenerating: true });
-            const b64 = await fileToBase64(slide.imageFile);
-            const data = await fetchGemini(['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'], {
-              contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
-            }, apiKey);
-            const script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (!script) throw new Error("Gemini failed to generate a script.");
-            updateSlide(slide.id, { script });
-          } catch (e) {
-            console.error(e);
-            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
-          } finally {
-            updateSlide(slide.id, { isGenerating: false });
-            done++;
-            setProgress(p => ({ ...p, percent: Math.round((done / toProcess.length) * 100), msg: `Processed ${done}/${toProcess.length} scripts` }));
+        setSlides(prev => {
+          if (prev.length === 1 && !prev[0].imageFile && !prev[0].script) {
+            return newSlides;
+          } else {
+            return [...prev, ...newSlides];
           }
+        });
+        
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
         }
-        setTimeout(() => setProgress(null), 2000);
       };
 
-      const runBulkVoiceovers = async () => {
-        setProgress({ step: 3, percent: 0, msg: 'Generating voiceovers...' });
-        let done = 0;
-        const toProcess = slides.filter(s => s.script && !s.audioUrl);
-        for (const slide of toProcess) {
-          try {
-            updateSlide(slide.id, { isGeneratingVoice: true });
-            const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'], {
-              contents: [{ parts: [{ text: slide.script }] }],
-              generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice || globalVoice } } } }
-            }, apiKey);
-            const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-            if (part) {
-              const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
-              updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
-            } else {
-              throw new Error("Failed to generate audio track.");
-            }
-          } catch (e) {
-            console.error(e);
-            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
-          } finally {
-            updateSlide(slide.id, { isGeneratingVoice: false });
-            done++;
-            setProgress(p => ({ ...p, percent: Math.round((done / toProcess.length) * 100), msg: `Processed ${done}/${toProcess.length} voices` }));
-          }
-        }
-        setTimeout(() => setProgress(null), 2000);
-      };
-
-      const generateSlideAudio = async (slide) => {
-        if (!apiKey) {
-          setPendingAction({ type: 'slideAudio', payload: slide });
-          setShowApiModal(true);
+      const startWithAI = () => {
+        if (!userApiKey.trim()) {
+          alert("Please enter a valid Gemini API Key.");
           return;
         }
-        if (!slide.script) return alert("Please write or generate a script first.");
-        try {
-          updateSlide(slide.id, { isGenerating: true });
-          const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash'], {
-            contents: [{ parts: [{ text: slide.script }] }],
-            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
-          }, apiKey);
-          const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-          if (part) {
-            const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
-            updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
-          } else {
-            throw new Error("Failed to generate audio.");
-          }
-        } catch (e) {
-          console.error(e);
-          alert(`Audio failed (${e.model || 'API'}): ${e.message}`);
-        } finally {
-          updateSlide(slide.id, { isGenerating: false });
+        setAiStatus('ready');
+        setView('app');
+      };
+      
+      const skipAI = () => {
+        setAiStatus('skipped');
+        setView('app');
+      };
+
+      const autoGenerateScript = async (id) => {
+        const slide = slides.find(s => s.id === id);
+        if (!slide || !slide.imageFile) {
+          alert("Please upload an image for this slide first.");
+          return;
         }
+
+        if (aiStatus !== 'ready' || !userApiKey) {
+          alert("AI was skipped or no API key provided. Please reload the app to enter your key.");
+          return;
+        }
+
+        updateSlide(id, { isGeneratingScript: true, scriptGenerationProgress: 'Analyzing Slide...' });
+
+        try {
+          const base64Image = await fileToBase64(slide.imageFile);
+          
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${userApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: "Act as an expert educator. Look at this presentation slide and provide a comprehensive, clear, and easy-to-understand explanation for students. Your explanation should be detailed enough that students will not need extra support to understand the concept shown. Aim for a thorough narrative style (about 5-8 sentences) that covers all key details, context, and implications. Return only the script text." },
+                  { inlineData: { mimeType: slide.imageFile.type, data: base64Image } }
+                ]
+              }]
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`API Error: ${response.status} - Please check if your API key is correct.`);
+          }
+
+          const data = await response.json();
+          const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (generatedText) {
+             updateSlide(id, { script: generatedText.trim(), isGeneratingScript: false, scriptGenerationProgress: '' });
+          } else {
+             throw new Error("No text generated by AI");
+          }
+        } catch (err) {
+          console.error("Gemini AI Generation failed:", err);
+          alert("Failed to auto-generate script. " + err.message);
+          updateSlide(id, { isGeneratingScript: false, scriptGenerationProgress: '' });
+        }
+      };
+
+      const generateAudioForSlide = async (id) => {
+        const slide = slides.find(s => s.id === id);
+        if (!slide || !(slide.script || "").trim()) return;
+
+        updateSlide(id, { isGenerating: true });
+        try {
+          const audioBlob = await generateTTS(slide.script, slide.voice, userApiKey);
+          const audioUrl = URL.createObjectURL(audioBlob);
+          updateSlide(id, { audioBlob, audioUrl, isGenerating: false });
+        } catch (error) {
+          console.error("Audio generation failed:", error);
+          updateSlide(id, { isGenerating: false });
+          alert("Failed to generate audio. Please check your script and try again.");
+        }
+      };
+
+      const playAudio = (url) => {
+        if (!url) return;
+        const audio = new Audio(url);
+        audio.play().catch(e => console.error("Audio playback failed:", e));
       };
 
       const compileVideo = async () => {
-        setProgress({ step: 4, percent: 0, msg: 'Preparing compiler...' });
+        if (slides.length === 0) return;
+        setIsCompiling(true);
+        setCompilationProgress("Initializing canvas...");
+
         try {
-          const { Muxer, ArrayBufferTarget } = window.WebMMuxer;
-          const canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 720;
+          const canvas = document.createElement('canvas');
+          canvas.width = 1280;
+          canvas.height = 720;
           const ctx = canvas.getContext('2d');
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          await audioCtx.resume();
+
+          const getStream = canvas.captureStream || canvas.mozCaptureStream;
+          if (!getStream) {
+            throw new Error("Your browser does not support canvas video export. Try Chrome or Edge.");
+          }
           
-          if (slides.length === 0) throw new Error("No slides to compile.");
-          let totalMs = 0;
-          const visuals = await Promise.all(slides.map(async (s, i) => {
-            const img = s.preview ? await new Promise(r => { const m = new Image(); m.onload = () => r(m); m.src = s.preview; }) : null;
-            let dur = 3000;
-            let buf = null;
-            if (s.audioBlob) {
-              console.log(`Decoding slide ${i+1} audio... Blob size:`, s.audioBlob.size);
-              const ab = await s.audioBlob.arrayBuffer();
-              buf = await audioCtx.decodeAudioData(ab);
-              console.log(`Slide ${i+1} audio decoded. Duration:`, buf.duration);
-              dur = Math.max(buf.duration * 1000, 500);
-            }
-            const res = { img, sentences: s.script ? s.script.split(/(?<=[.!?])\s+/).filter(Boolean).map(x => x.trim()) : [], duration: dur, start: totalMs, buffer: buf };
-            totalMs += dur;
-            return res;
-          }));
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) {
+            throw new Error("Your browser does not support AudioContext.");
+          }
 
-          const fps = 30; const totalFrames = Math.ceil((totalMs / 1000) * fps);
-          const sampleRate = 48000;
-          const offlineCtx = new OfflineAudioContext(1, Math.ceil(totalMs / 1000 * sampleRate), sampleRate);
-          visuals.forEach((v, i) => {
-            if (v.buffer) {
-              console.log(`Scheduling slide ${i+1} audio at start time:`, v.start / 1000);
-              const src = offlineCtx.createBufferSource(); src.buffer = v.buffer;
-              src.connect(offlineCtx.destination); src.start(v.start / 1000);
+          const audioCtx = new AudioContextClass();
+          const dest = audioCtx.createMediaStreamDestination();
+
+          const canvasStream = getStream.call(canvas, 30); 
+          const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...dest.stream.getAudioTracks()
+          ]);
+
+          let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+              options = { mimeType: 'video/mp4' };
             }
+          }
+
+          const recorder = new MediaRecorder(combinedStream, options);
+          const chunks = [];
+          recorder.ondataavailable = e => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+          };
+
+          const recordPromise = new Promise(resolve => {
+            recorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType }));
           });
-          console.log("Starting offline rendering...");
-          const renderedAudio = await offlineCtx.startRendering();
-          const audioData = renderedAudio.getChannelData(0);
-          console.log("Offline rendering complete. Audio samples:", audioData.length);
 
-          const muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'V_VP8', width: 1280, height: 720, framerate: fps }, audio: { codec: 'A_OPUS', sampleRate, numberOfChannels: 1 } });
-          const vEnc = new VideoEncoder({ output: (c, m) => { muxer.addVideoChunk(c, m); }, error: e => console.error('VideoEncoder error:', e) });
-          vEnc.configure({ codec: 'vp8', width: 1280, height: 720, bitrate: 2e6 });
-          const aEnc = new AudioEncoder({ output: (c, m) => { muxer.addAudioChunk(c, m); }, error: e => console.error('AudioEncoder error:', e) });
-          aEnc.configure({ codec: 'opus', sampleRate, numberOfChannels: 1, bitrate: 128000 });
+          recorder.start();
 
-          // Interleaved encoding
-          let audioIndex = 0;
-          // Opus frames are typically 20ms (960 samples @ 48kHz). We'll feed 20ms chunks.
-          const encoderChunkSamples = Math.floor(sampleRate * 0.02);
+          let isRecording = true;
+          let currentSlideVisual = null;
 
-          for (let f = 0; f < totalFrames; f++) {
-            const timeMs = (f / fps) * 1000;
-            const timeUs = timeMs * 1000;
+          const renderLoop = () => {
+            if (!isRecording) return;
             
-            // Encode audio up to this video frame's time
-            const targetAudioSamples = Math.floor((timeMs / 1000) * sampleRate);
+            ctx.fillStyle = '#0f172a'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (currentSlideVisual) {
+              const imageAreaW = 920;
+              const sidebarW = 360;
+              
+              ctx.fillStyle = '#1e293b';
+              ctx.fillRect(0, 0, imageAreaW, canvas.height);
+
+              if (currentSlideVisual.img) {
+                const img = currentSlideVisual.img;
+                const scale = Math.min(imageAreaW / img.width, canvas.height / img.height);
+                const w = img.width * scale;
+                const h = img.height * scale;
+                const x = (imageAreaW - w) / 2;
+                const y = (canvas.height - h) / 2;
+                ctx.drawImage(img, x, y, w, h);
+              } else {
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 40px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(currentSlideVisual.text, imageAreaW / 2, canvas.height / 2);
+              }
+
+              ctx.strokeStyle = '#334155';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(imageAreaW, 0);
+              ctx.lineTo(imageAreaW, canvas.height);
+              ctx.stroke();
+
+              if (currentSlideVisual.sentences && currentSlideVisual.duration > 0) {
+                const elapsed = performance.now() - currentSlideVisual.startTime;
+                const progress = Math.min(1, Math.max(0, elapsed / currentSlideVisual.duration));
+                
+                const totalSentences = currentSlideVisual.sentences.length;
+                const visibleCount = Math.min(totalSentences, Math.floor(progress * totalSentences) + 1);
+
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                
+                let currentY = 40;
+                const startX = imageAreaW + 30;
+                const maxTextW = sidebarW - 60;
+
+                for (let j = 0; j < totalSentences; j++) {
+                  if (j < visibleCount) {
+                    const isCurrent = j === visibleCount - 1;
+                    ctx.fillStyle = isCurrent ? '#ffffff' : '#94a3b8';
+                    ctx.font = (isCurrent ? 'bold ' : '') + '22px sans-serif';
+                    
+                    const words = currentSlideVisual.sentences[j].split(' ');
+                    let line = '';
+                    
+                    for(let n = 0; n < words.length; n++) {
+                      const testLine = line + words[n] + ' ';
+                      const metrics = ctx.measureText(testLine);
+                      if (metrics.width > maxTextW && n > 0) {
+                        ctx.fillText(line, startX, currentY);
+                        line = words[n] + ' ';
+                        currentY += 30;
+                      } else {
+                        line = testLine;
+                      }
+                    }
+                    ctx.fillText(line, startX, currentY);
+                    currentY += 40; 
+                  }
+                }
+              }
+            }
+            requestAnimationFrame(renderLoop);
+          };
+          
+          requestAnimationFrame(renderLoop);
+
+          for (let i = 0; i < slides.length; i++) {
+            const slide = slides[i];
+            setCompilationProgress(`Processing slide ${i + 1} of ${slides.length}...`);
             
-            while (audioIndex + encoderChunkSamples <= targetAudioSamples && audioIndex + encoderChunkSamples <= audioData.length) {
-              const slice = audioData.slice(audioIndex, audioIndex + encoderChunkSamples);
-              const data = new AudioData({ 
-                format: 'f32-planar', 
-                sampleRate, 
-                numberOfFrames: encoderChunkSamples, 
-                numberOfChannels: 1, 
-                timestamp: Math.round((audioIndex / sampleRate) * 1e6), 
-                data: slice 
+            const sentenceRegex = /[^.!?]+[.!?]+|\s*$/g;
+            const rawSentences = slide.script ? slide.script.match(sentenceRegex) : [];
+            const sentences = rawSentences ? rawSentences.map(s => s.trim()).filter(Boolean) : [];
+            if (sentences.length === 0 && slide.script) sentences.push(slide.script);
+
+            let slideImg = null;
+            if (slide.imagePreviewUrl) {
+              slideImg = new Image();
+              slideImg.src = slide.imagePreviewUrl;
+              await new Promise((resolve) => { 
+                slideImg.onload = resolve; 
+                slideImg.onerror = () => {
+                  console.warn(`Failed to load image for slide ${i+1}`);
+                  resolve(); 
+                };
               });
-              aEnc.encode(data); 
-              data.close();
-              audioIndex += encoderChunkSamples;
             }
 
-            const slide = visuals.find(v => timeMs >= v.start && timeMs < v.start + v.duration) || visuals[visuals.length - 1];
-            drawSlideVisual(ctx, 1280, 720, slide, timeMs - slide.start);
-            const frame = new VideoFrame(canvas, { timestamp: Math.round(timeUs) });
-            vEnc.encode(frame); frame.close();
-            
-            while (vEnc.encodeQueueSize > 5 || aEnc.encodeQueueSize > 5) {
-              await new Promise(r => setTimeout(r, 10));
+            let audioDurationMs = 3000; 
+            let audioBuffer = null;
+
+            if (slide.audioBlob) {
+              try {
+                const arrayBuffer = await slide.audioBlob.arrayBuffer();
+                audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioDurationMs = audioBuffer.duration * 1000;
+              } catch (audioErr) {
+                console.error(`Audio processing failed for slide ${i+1}:`, audioErr);
+              }
+            } else if (slide.script) {
+               audioDurationMs = Math.max(3000, slide.script.length * 60);
             }
-            if (f % 30 === 0) setProgress(p => ({ ...p, percent: Math.round(f / totalFrames * 100), msg: 'Rendering frames...' }));
+
+            currentSlideVisual = { 
+              img: slideImg, 
+              text: `Slide ${i + 1} (No Image)`,
+              sentences: sentences,
+              duration: audioDurationMs,
+              startTime: performance.now()
+            };
+
+            if (audioBuffer) {
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(dest);
+                source.start();
+                await new Promise(r => { source.onended = r; });
+            } else {
+                await new Promise(r => setTimeout(r, audioDurationMs));
+            }
           }
 
-          // Remainder audio
-          while (audioIndex + encoderChunkSamples <= audioData.length) {
-            const slice = audioData.slice(audioIndex, audioIndex + encoderChunkSamples);
-            const data = new AudioData({ format: 'f32-planar', sampleRate, numberOfFrames: encoderChunkSamples, numberOfChannels: 1, timestamp: Math.round((audioIndex / sampleRate) * 1e6), data: slice });
-            aEnc.encode(data); data.close();
-            audioIndex += encoderChunkSamples;
+          setCompilationProgress("Finalizing video file...");
+          isRecording = false; 
+          recorder.stop();
+          
+          const finalBlob = await recordPromise;
+          setFinalVideoUrl(URL.createObjectURL(finalBlob));
+          
+          if (audioCtx.state !== 'closed') {
+            await audioCtx.close();
           }
 
-          await vEnc.flush(); await aEnc.flush(); muxer.finalize();
-          setFinalVideo(URL.createObjectURL(new Blob([muxer.target.buffer], { type: 'video/webm' })));
-          setProgress(null);
-        } catch (e) {
-          console.error(e);
-          alert("Compile failed: " + (e.message || String(e)));
-          setProgress(null);
+        } catch (err) {
+          console.error("Compilation failed:", err);
+          alert(err.message || "Video compilation failed. See console for details.");
+        } finally {
+          setIsCompiling(false);
+          setCompilationProgress("");
         }
       };
 
-      return (
-        <div className="min-h-screen flex flex-col">
-          <header className="glass sticky top-0 z-20 border-b border-slate-200/50 px-8 py-4 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center"><Video className="text-white w-6 h-6" /></div>
-              <h1 className="text-xl font-black text-slate-900 uppercase tracking-tighter">AI Voice-Over-Slides</h1>
+      if (view === 'home') {
+        return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans text-slate-800">
+            <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-slate-100 text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-200">
+                <Sparkles className="text-white w-8 h-8" />
+              </div>
+              
+              <h1 className="text-2xl font-bold text-slate-900 mb-3">Welcome to SlideCaster</h1>
+              
+              <p className="text-slate-600 mb-6 text-sm leading-relaxed">
+                To use automatic slide script generation, please provide your <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-semibold hover:underline">Gemini API Key</a>. Your key is securely used locally and never stored on our servers.
+              </p>
+
+              <div className="mb-8 text-left">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Gemini API Key</label>
+                <input 
+                  type="password" 
+                  value={userApiKey}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  Don't have one? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">Get it here for free.</a>
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={startWithAI}
+                  disabled={!userApiKey.trim()}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2"
+                >
+                  Save Key & Start
+                </button>
+                <button
+                  onClick={skipAI}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-4 rounded-xl transition-colors"
+                >
+                  Skip AI (Type manually)
+                </button>
+              </div>
             </div>
-            {!apiKey ? (
-              <button onClick={() => setShowApiModal(true)} className="flex items-center gap-2 text-xs font-black bg-slate-100 text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-200 transition-all uppercase"><Settings className="w-4 h-4"/> Set API Key</button>
-            ) : (
-              <div className="text-xs font-black bg-emerald-100 text-emerald-700 px-4 py-2 rounded-lg uppercase">API KEY ACTIVE</div>
-            )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-10 flex-shrink-0">
+            <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
+                  <Video className="text-white w-5 h-5" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-slate-900">SlideCaster</h1>
+                  <p className="text-xs text-slate-500 font-medium">Turn presentations into narrated videos</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <Settings className="w-4 h-4 text-slate-500" />
+                  <span className="text-slate-600 font-medium">Global Voice:</span>
+                  <select 
+                    value={globalVoice}
+                    onChange={(e) => {
+                      setGlobalVoice(e.target.value);
+                      setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
+                    }}
+                    className="bg-transparent font-semibold text-indigo-700 outline-none"
+                  >
+                    {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
           </header>
 
-          <main className="flex-1 max-w-6xl mx-auto w-full p-8 md:p-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
-              {[
-                { s: 1, t: "1. Upload", d: "Bulk upload images", i: <Upload />, a: () => fileInputRef.current.click() },
-                { s: 2, t: "2. Scripts", d: "Generate text logic", i: <Star />, a: () => handleActionWithApi('scripts'), p: progress?.step === 2 },
-                { s: 3, t: "3. Voiceovers", d: "Generate speech", i: <Mic />, a: () => handleActionWithApi('voiceovers'), p: progress?.step === 3, 
-                  extra: (
-                    <div className="mt-4 flex flex-col gap-2" onClick={e => e.stopPropagation()}>
-                      <select value={globalVoice} onChange={e => { setGlobalVoice(e.target.value); setSlides(s => s.map(x => ({ ...x, voice: e.target.value }))); }} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold outline-none cursor-pointer">
-                        {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                      {previewLoading ? (
-                        <div className="flex justify-center p-2"><Loader className="w-4 h-4 text-indigo-500 animate-spin" /></div>
-                      ) : playingAudio ? (
-                        <button onClick={() => { playingAudio.pause(); setPlayingAudio(null); }} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-red-100 text-red-600 px-3 py-2 rounded-lg hover:bg-red-200 transition-all uppercase"><Icon path='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>' className="w-3 h-3"/> STOP PREVIEW</button>
-                      ) : (
-                        <button onClick={() => handleActionWithApi('preview')} className="w-full flex items-center justify-center gap-2 text-xs font-black bg-indigo-100 text-indigo-600 px-3 py-2 rounded-lg hover:bg-indigo-200 transition-all uppercase"><Play className="w-3 h-3"/> PREVIEW VOICE</button>
-                      )}
-                    </div>
-                  )
-                },
-                { s: 4, t: "4. Compile", d: "Export WebM Video", i: <Video />, a: compileVideo, p: progress?.step === 4, primary: true }
-              ].map(step => (
-                <div key={step.s} className={`p-6 rounded-3xl border transition-all flex flex-col ${step.primary ? 'bg-indigo-600 border-indigo-500 shadow-indigo-200 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'}`}>
-                  <div className="flex justify-between items-center mb-4"><span className={`text-xs font-black px-2 py-1 rounded ${step.primary ? 'bg-white/20' : 'bg-indigo-100 text-indigo-700'}`}>STEP {step.s}</span>{step.i}</div>
-                  <h3 className="font-black text-lg mb-1">{step.t}</h3>
-                  <p className={`text-xs mb-6 flex-1 ${step.primary ? 'text-white/70' : 'text-slate-500'}`}>{step.d}</p>
-                  <button onClick={step.a} disabled={progress !== null && progress.step !== step.s} className={`w-full py-3 rounded-xl font-bold text-sm transition-all active:scale-95 ${step.primary ? 'bg-white text-indigo-600 hover:bg-white/90 disabled:bg-white/50' : 'bg-slate-100 hover:bg-slate-200 disabled:opacity-50'}`}>
-                    {step.p ? <Loader className="w-4 h-4 animate-spin mx-auto" /> : (step.primary ? "START EXPORT" : "START")}
-                  </button>
-                  {step.extra}
-                  {step.p && (
-                    <div className="mt-4">
-                      <div className="flex justify-between items-end mb-2">
-                        <span className={`text-[10px] font-bold ${step.primary ? 'text-white' : 'text-indigo-600'}`}>{progress.msg}</span>
-                        <span className={`text-[10px] font-black ${step.primary ? 'text-white/80' : 'text-slate-400'}`}>{progress.percent}%</span>
-                      </div>
-                      <div className={`h-1.5 rounded-full overflow-hidden ${step.primary ? 'bg-black/20' : 'bg-slate-100'}`}>
-                        <div className={`h-full transition-all duration-300 ease-out ${step.primary ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`} style={{ width: `${progress.percent}%` }} />
-                      </div>
-                    </div>
-                  )}
+          <main className="max-w-5xl mx-auto px-6 py-8 flex-grow w-full">
+            <div className="mb-8 bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex gap-4">
+              <div className="mt-1">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-indigo-600" />
                 </div>
-              ))}
+              </div>
+              <div>
+                <h3 className="font-semibold text-indigo-900 mb-1">How it works</h3>
+                <p className="text-sm text-indigo-800/80 mb-3">
+                  Export your PowerPoint slides as Images (File &gt; Export &gt; Change File Type &gt; JPEG/PNG). Upload them here, type the script for each slide, and we'll generate the voiceover and stitch it all into a high-quality video!
+                </p>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  className="hidden" 
+                  ref={fileInputRef}
+                  onChange={handleBulkImageUpload}
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <Presentation className="w-4 h-4" />
+                  Bulk Upload Slide Images
+                </button>
+              </div>
             </div>
 
-            <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleBulkUpload} />
-
-            <div className="space-y-6">
-              {slides.map((slide, idx) => (
-                <div key={slide.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-auto md:h-64 transition-all hover:shadow-xl hover:border-indigo-200">
-                  <div className="md:w-72 bg-slate-100 flex items-center justify-center p-4 relative group">
-                    {slide.preview ? <img src={slide.preview} className="max-h-full max-w-full rounded-lg shadow-md" /> : <Monitor className="w-12 h-12 text-slate-300" />}
-                    <div className="absolute top-4 left-4 bg-black/80 text-white text-[10px] font-black px-2 py-1 rounded">{idx + 1}</div>
-                  </div>
-                  <div className="flex-1 p-6 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center gap-2 font-bold text-slate-700 text-sm italic"><Mic className="w-4 h-4" /> Voiceover Script</div>
-                      <button onClick={() => setSlides(s => s.filter(x => x.id !== slide.id))} className="text-slate-300 hover:text-red-500"><Trash className="w-5 h-5" /></button>
+            <div className="space-y-6 mb-12">
+              {slides.map((slide, index) => (
+                <div key={slide.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md">
+                  
+                  <div className="md:w-1/3 bg-slate-100 border-r border-slate-200 relative group min-h-[200px] flex items-center justify-center p-4">
+                    {slide.imagePreviewUrl ? (
+                      <>
+                        <img src={slide.imagePreviewUrl} alt={`Slide ${index + 1}`} className="max-h-full max-w-full rounded shadow-sm object-contain" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <label className="cursor-pointer bg-white text-slate-800 text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 hover:bg-slate-50 transition-colors">
+                            <Upload className="w-4 h-4" /> Change Image
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
+                          </label>
+                        </div>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+                        <Presentation className="w-8 h-8 mb-2 opacity-50" />
+                        <span className="text-sm font-medium">Upload Slide Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
+                      </label>
+                    )}
+                    <div className="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-700 text-xs font-bold px-2 py-1 rounded shadow-sm border border-slate-200/50">
+                      {index + 1}
                     </div>
-                    <textarea value={slide.script} onChange={e => updateSlide(slide.id, { script: e.target.value })} placeholder="Write or generate a script..." className="flex-1 w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm resize-none focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                    <div className="mt-4 flex justify-end items-center gap-3">
-                      {slide.isGenerating ? (
-                        <Loader className="w-5 h-5 animate-spin text-indigo-600" />
-                      ) : (
-                        <>
-                          {slide.audioUrl && (
-                            <button onClick={() => new Audio(slide.audioUrl).play()} className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-all">
-                              <Play className="w-3 h-3" /> LISTEN
-                            </button>
+                  </div>
+
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <Mic className="w-4 h-4 text-slate-400" /> Voiceover Script
+                      </label>
+                      
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => autoGenerateScript(slide.id)}
+                          disabled={!slide.imagePreviewUrl || slide.isGeneratingScript || aiStatus !== 'ready'}
+                          className="text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-100"
+                          title={aiStatus === 'ready' ? "Generate comprehensive educational explanation" : "AI was skipped. Reload to enable."}
+                        >
+                          {slide.isGeneratingScript ? (
+                             <><Loader2 className="w-3 h-3 animate-spin" /> {slide.scriptGenerationProgress || 'Analyzing...'}</>
+                          ) : (
+                             <><Sparkles className="w-3 h-3" /> Auto-Generate Script</>
                           )}
-                          <button onClick={() => generateSlideAudio(slide)} className="flex items-center gap-2 text-indigo-600 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">
-                            <Mic className="w-3 h-3" /> {slide.audioUrl ? 'RE-GENERATE VOICE' : 'GENERATE VOICE'}
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleRemoveSlide(slide.id)}
+                          className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                          title="Remove Slide"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <textarea 
+                      className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
+                      placeholder="Type the script you want spoken during this slide..."
+                      value={slide.script}
+                      onChange={(e) => updateSlide(slide.id, { script: e.target.value })}
+                    />
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                      <div className="flex items-center gap-2">
+                        <select 
+                          value={slide.voice}
+                          onChange={(e) => updateSlide(slide.id, { voice: e.target.value })}
+                          className="text-sm bg-white border border-slate-200 text-slate-700 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {slide.audioUrl && (
+                          <button 
+                            onClick={() => playAudio(slide.audioUrl)}
+                            className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                            title="Preview Audio"
+                          >
+                            <Play className="w-4 h-4 ml-0.5" />
                           </button>
-                        </>
-                      )}
+                        )}
+                        
+                        <button 
+                          onClick={() => generateAudioForSlide(slide.id)}
+                          disabled={!(slide.script || "").trim() || slide.isGenerating}
+                          className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          {slide.isGenerating ? (
+                             <><Loader2 className="w-4 h-4 animate-spin" /> Generating Voice...</>
+                          ) : (
+                             <><Mic className="w-4 h-4" /> {slide.audioUrl ? "Regenerate Voice" : "Generate Voice"}</>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
-              <button onClick={() => setSlides(s => [...s, { id: Math.random(), imageFile: null, preview: null, script: '', voice: globalVoice, audioUrl: null }])} className="w-full py-8 border-4 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black flex flex-col items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-300 hover:text-indigo-500 transition-all uppercase text-xs tracking-widest"><Plus className="w-8 h-8" /> Add Manual Slide</button>
+
+              <button 
+                onClick={handleAddSlide}
+                className="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 font-medium flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-600 transition-all"
+              >
+                <Plus className="w-5 h-5" /> Add Another Slide
+              </button>
             </div>
           </main>
 
-          {finalVideo && (
-            <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-50 flex items-center justify-center p-8">
-              <div className="max-w-4xl w-full bg-white rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                <div className="px-10 py-8 border-b flex justify-between items-center bg-indigo-50/50">
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Video Ready</h2>
-                  <button onClick={() => setFinalVideo(null)} className="p-2 hover:bg-slate-200 rounded-full transition-all">✕</button>
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-slate-500 font-medium">
+                Total Slides: <span className="text-slate-900">{slides.length}</span>
+              </div>
+              
+              <button 
+                onClick={compileVideo}
+                disabled={isCompiling || slides.length === 0}
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+              >
+                {isCompiling ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> {compilationProgress}</>
+                ) : (
+                  <><Video className="w-5 h-5" /> Compile Video</>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {finalVideoUrl && (
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+              <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-slate-900">Your Video is Ready!</h2>
+                  <button 
+                    onClick={() => setFinalVideoUrl(null)}
+                    className="text-slate-400 hover:text-slate-600 p-2"
+                  >
+                    Close
+                  </button>
                 </div>
-                <div className="p-10 bg-slate-900 aspect-video flex items-center justify-center">
-                  <video src={finalVideo} controls className="max-h-full rounded-2xl shadow-2xl border border-white/10" />
+                
+                <div className="bg-slate-100 p-6 flex justify-center">
+                  <video 
+                    src={finalVideoUrl} 
+                    controls 
+                    className="max-h-[50vh] rounded-xl shadow-md bg-black"
+                  />
                 </div>
-                <div className="p-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                  <div className="text-slate-500 text-sm font-medium italic">High quality WebM exported successfully.</div>
-                  <div className="flex gap-4">
-                    <button onClick={() => setFinalVideo(null)} className="px-8 py-4 font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-all uppercase text-xs">Edit More</button>
-                    <a href={finalVideo} download="TooLabX_Video.webm" className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:scale-105 transition-all flex items-center gap-3 uppercase text-xs tracking-widest"><Download className="w-5 h-5" /> Download Export</a>
-                  </div>
+                
+                <div className="p-6 flex justify-end gap-3 bg-slate-50 border-t border-slate-100">
+                  <button 
+                    onClick={() => setFinalVideoUrl(null)}
+                    className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors"
+                  >
+                    Back to Editor
+                  </button>
+                  <a 
+                    href={finalVideoUrl} 
+                    download="Presentation_Video.webm"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+                  >
+                    <Download className="w-5 h-5" /> Download Video
+                  </a>
                 </div>
               </div>
             </div>
           )}
 
-          {showApiModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-2xl animate-in zoom-in duration-200">
-                <h2 className="text-2xl font-black text-slate-900 mb-2">API Key Required</h2>
-                <p className="text-sm text-slate-500 mb-6">To automatically generate scripts or AI voiceovers, you need a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 hover:underline font-bold">Google AI Studio</a>.</p>
-                <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste your API key here..." className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-6" />
-                <div className="flex flex-col gap-3">
-                  <button onClick={() => setShowApiModal(false)} disabled={!apiKey} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl disabled:bg-slate-300 hover:bg-indigo-700 transition-all">Save & Continue</button>
-                  <button onClick={() => { setPendingAction(null); setShowApiModal(false); }} className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200 transition-all text-sm">Close and Continue Manually</button>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="h-24"></div> 
         </div>
       );
     }
 
-    const container = document.getElementById('root');
-    const root = ReactDOM.createRoot(container);
-    root.render(<App />);
+    class AppErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+      }
+
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+
+      componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught an error", error, errorInfo);
+        this.setState({ errorInfo });
+      }
+
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#fef2f2', color: '#991b1b', height: '100vh' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Application Crash Detected</h1>
+              <p>The code encountered a critical module or render error. See details below:</p>
+              <pre style={{ background: 'white', padding: '10px', marginTop: '10px', border: '1px solid #fca5a5', overflow: 'auto' }}>
+                {this.state.error && this.state.error.toString()}
+              </pre>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(
+      <AppErrorBoundary>
+        <SlideCasterApp />
+      </AppErrorBoundary>
+    );
   </script>
 </body>
 </html>
