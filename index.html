@@ -69,7 +69,7 @@
         }
       } catch (e) {
         console.error(e);
-        alert("Failed to load voice preview: " + (e.message || "Unknown error"));
+        alert(`Failed to load voice preview (gemini-2.0-flash-exp): ${e.message || "Unknown error"}`);
       } finally {
         setPreviewLoading(false);
       }
@@ -122,6 +122,7 @@
       if (!res.ok) {
         const error = new Error(`API Error ${res.status}`);
         error.status = res.status;
+        error.model = endpoint;
         throw error;
       }
       return res.json();
@@ -205,7 +206,7 @@
             if (!script) {
               updateSlide(slide.id, { isGenerating: true });
               const b64 = await fileToBase64(slide.imageFile);
-              const data = await fetchGemini('gemini-1.5-flash-latest', {
+              const data = await fetchGemini('gemini-1.5-flash', {
                 contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
               }, apiKey);
               script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -228,7 +229,7 @@
             }
           } catch (e) {
             console.error(e);
-            alert(`Error on Slide ${slides.indexOf(slide) + 1}: ${e.message}`);
+            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
           } finally {
             updateSlide(slide.id, { isGenerating: false });
             done++;
