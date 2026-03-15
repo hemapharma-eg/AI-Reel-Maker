@@ -52,8 +52,8 @@
       if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
       try {
         setPreviewLoading(true);
-        console.log(`Previewing voice: ${voiceName} using gemini-2.0-flash-exp...`);
-        const data = await fetchGemini('gemini-2.0-flash-exp', {
+        console.log(`Previewing voice: ${voiceName}...`);
+        const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'], {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -114,29 +114,44 @@
       reader.readAsDataURL(file);
     });
 
-    async function fetchGemini(endpoint, payload, key) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent`;
-      console.log(`Fetching Gemini (${endpoint})...`);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-goog-api-key': (key || '').trim()
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        let errMsg = `API Error ${res.status}`;
-        try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
-        
-        // Auto-fallback system removed; endpoints should exactly specify capabilities
+    async function fetchGemini(models, payload, key) {
+      const modelArray = Array.isArray(models) ? models : [models];
+      let lastError;
 
-        const error = new Error(errMsg);
-        error.status = res.status;
-        error.model = endpoint;
-        throw error;
+      for (let i = 0; i < modelArray.length; i++) {
+        const endpoint = modelArray[i];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent`;
+        console.log(`Fetching Gemini (${endpoint})...`);
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': (key || '').trim()
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!res.ok) {
+            let errMsg = `API Error ${res.status}`;
+            try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
+            const error = new Error(errMsg);
+            error.status = res.status;
+            error.model = endpoint;
+            throw error;
+          }
+          return await res.json();
+        } catch (e) {
+          lastError = e;
+          console.warn(`Failed with ${endpoint}: ${e.message}`);
+          // If 403 (Invalid Key) or 400 (Bad Request - e.g unsupported modalities), break immediately unless it's just a fallback we want to try anyway.
+          // Wait, actually let's just retry on 404, 429, 500, 503.
+          if (![404, 429, 500, 503].includes(e.status)) {
+            break;
+          }
+        }
       }
-      return res.json();
+      throw lastError;
     }
 
     const drawSlideVisual = (ctx, w, h, slide, elapsed) => {
@@ -224,7 +239,7 @@
           try {
             updateSlide(slide.id, { isGenerating: true });
             const b64 = await fileToBase64(slide.imageFile);
-            const data = await fetchGemini('gemini-2.0-flash', {
+            const data = await fetchGemini(['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'], {
               contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
             }, apiKey);
             const script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -249,7 +264,7 @@
         for (const slide of toProcess) {
           try {
             updateSlide(slide.id, { isGeneratingVoice: true });
-            const data = await fetchGemini('gemini-2.0-flash-exp', {
+            const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'], {
               contents: [{ parts: [{ text: slide.script }] }],
               generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice || globalVoice } } } }
             }, apiKey);
@@ -281,7 +296,7 @@
         if (!slide.script) return alert("Please write or generate a script first.");
         try {
           updateSlide(slide.id, { isGenerating: true });
-          const data = await fetchGemini('gemini-2.0-flash-exp', {
+          const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'], {
             contents: [{ parts: [{ text: slide.script }] }],
             generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
           }, apiKey);
