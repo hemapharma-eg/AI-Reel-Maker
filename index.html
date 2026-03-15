@@ -25,19 +25,42 @@
 
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
-    const { 
-      Play, 
-      Video, 
-      Plus, 
-      Trash2, 
-      Presentation, 
-      Mic, 
-      Download, 
-      Loader2, 
-      Upload,
-      Settings,
-      Sparkles
-    } = LucideReact;
+    // Safety check for Lucide icons to prevent crash if library version mismatch or missing from CDN
+    const getSafeIcon = (name) => {
+      // Try multiple possible global names used by various CDN versions
+      const Lib = (typeof LucideReact !== 'undefined' ? LucideReact : (typeof lucide !== 'undefined' ? lucide : null));
+      
+      // Try different lookup paths in the object
+      if (Lib) {
+        if (Lib[name]) return Lib[name];
+        // Some versions put components inside an 'icons' sub-object
+        if (Lib.icons && Lib.icons[name]) return Lib.icons[name];
+        // Handle case sensitivity variations
+        const lowerName = name.toLowerCase();
+        for (let key in Lib) {
+          if (key.toLowerCase() === lowerName) return Lib[key];
+        }
+      }
+
+      // Final bulletproof fallback: Simple SVG icon so the app never crashes
+      return (props) => (
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      );
+    };
+
+    const Play = getSafeIcon('Play');
+    const Video = getSafeIcon('Video');
+    const Plus = getSafeIcon('Plus');
+    const Trash2 = getSafeIcon('Trash2');
+    const Presentation = getSafeIcon('Presentation');
+    const Mic = getSafeIcon('Mic');
+    const Download = getSafeIcon('Download');
+    const Loader2 = getSafeIcon('Loader2');
+    const Upload = getSafeIcon('Upload');
+    const Settings = getSafeIcon('Settings');
+    const Sparkles = getSafeIcon('Sparkles');
 
     const apiKey = ""; // Will be provided by environment
 
