@@ -52,7 +52,7 @@
       if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
       try {
         setPreviewLoading(true);
-        const data = await fetchGemini('gemini-2.0-flash', {
+        const data = await fetchGemini('gemini-2.0-flash-exp', {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -64,10 +64,12 @@
           setPlayingAudio(audio);
           audio.play();
           audio.onended = () => setPlayingAudio(null);
+        } else {
+          throw new Error("No audio data in response. Check if your API key supports Gemini 2.0 Flash.");
         }
       } catch (e) {
         console.error(e);
-        alert("Failed to load voice preview.");
+        alert("Failed to load voice preview: " + (e.message || "Unknown error"));
       } finally {
         setPreviewLoading(false);
       }
@@ -78,6 +80,11 @@
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
       
+      // If it's already a WAV/container format (starts with RIFF), return as is
+      if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+        return new Blob([bytes], { type: 'audio/wav' });
+      }
+
       const wavBuffer = new ArrayBuffer(44 + bytes.byteLength);
       const view = new DataView(wavBuffer);
       const writeString = (v, offset, str) => { for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i)); };
@@ -198,15 +205,16 @@
             if (!script) {
               updateSlide(slide.id, { isGenerating: true });
               const b64 = await fileToBase64(slide.imageFile);
-              const data = await fetchGemini('gemini-1.5-flash', {
+              const data = await fetchGemini('gemini-1.5-flash-latest', {
                 contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
               }, apiKey);
               script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+              if (!script) throw new Error("Gemini failed to generate a script. Check your image format or API quotas.");
               updateSlide(slide.id, { script });
             }
 
             if (script && !slide.audioUrl) {
-              const data = await fetchGemini('gemini-2.0-flash', {
+              const data = await fetchGemini('gemini-2.0-flash-exp', {
                 contents: [{ parts: [{ text: script }] }],
                 generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
               }, apiKey);
@@ -214,10 +222,13 @@
               if (part) {
                 const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
                 updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
+              } else {
+                throw new Error("Failed to generate audio for script.");
               }
             }
           } catch (e) {
             console.error(e);
+            alert(`Error on Slide ${slides.indexOf(slide) + 1}: ${e.message}`);
           } finally {
             updateSlide(slide.id, { isGenerating: false });
             done++;
