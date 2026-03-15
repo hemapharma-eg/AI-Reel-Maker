@@ -51,7 +51,7 @@
       if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
       try {
         setPreviewLoading(true);
-        const data = await fetchGemini('gemini-2.5-flash-preview-tts', {
+        const data = await fetchGemini('gemini-2.0-flash-exp', {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -197,7 +197,7 @@
             if (!script) {
               updateSlide(slide.id, { isGenerating: true });
               const b64 = await fileToBase64(slide.imageFile);
-              const data = await fetchGemini('gemini-2.5-flash-preview-09-2025', {
+              const data = await fetchGemini('gemini-2.5-flash', {
                 contents: [{ parts: [{ text: "Act as an expert educator. Briefly explain this slide (2-3 sentences). Only return script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
               }, apiKey);
               script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -205,7 +205,7 @@
             }
 
             if (script && !slide.audioUrl) {
-              const data = await fetchGemini('gemini-2.5-flash-preview-tts', {
+              const data = await fetchGemini('gemini-2.0-flash-exp', {
                 contents: [{ parts: [{ text: script }] }],
                 generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
               }, apiKey);
@@ -229,7 +229,7 @@
       const compileVideo = async () => {
         setProgress({ step: 3, percent: 0, msg: 'Preparing compiler...' });
         try {
-          const { Muxer, ArrayBufferTarget } = await import('https://cdn.jsdelivr.net/npm/webm-muxer@5.0.2/+esm');
+          const { Muxer, ArrayBufferTarget } = await (new Function("return import('https://cdn.jsdelivr.net/npm/webm-muxer@5.0.2/+esm')"))();
           const canvas = document.createElement('canvas'); canvas.width = 1280; canvas.height = 720;
           const ctx = canvas.getContext('2d');
           const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
