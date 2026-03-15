@@ -52,7 +52,8 @@
       if (!apiKey) return alert("Please enter your Gemini API Key first to preview voices.");
       try {
         setPreviewLoading(true);
-        const data = await fetchGemini('gemini-2.0-flash-exp', {
+        console.log(`Previewing voice: ${voiceName} using gemini-2.0-flash...`);
+        const data = await fetchGemini('gemini-2.0-flash', {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -65,11 +66,11 @@
           audio.play();
           audio.onended = () => setPlayingAudio(null);
         } else {
-          throw new Error("No audio data in response. Check if your API key supports Gemini 2.0 Flash.");
+          throw new Error("No audio data in response. Gemini 2.0 might not be available in your region with this API key.");
         }
       } catch (e) {
-        console.error(e);
-        alert(`Failed to load voice preview (gemini-2.0-flash-exp): ${e.message || "Unknown error"}`);
+        console.error("Preview error:", e);
+        alert(`Failed to load voice preview (${e.model || 'API'}): ${e.message || "Unknown error"}. Check console for details.`);
       } finally {
         setPreviewLoading(false);
       }
@@ -114,13 +115,17 @@
     });
 
     async function fetchGemini(endpoint, payload, key) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent?key=${key}`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent?key=${key}`;
+      console.log(`Fetching Gemini (${endpoint})...`);
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        const error = new Error(`API Error ${res.status}`);
+        let errMsg = `API Error ${res.status}`;
+        try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
+        const error = new Error(errMsg);
         error.status = res.status;
         error.model = endpoint;
         throw error;
@@ -215,7 +220,7 @@
             }
 
             if (script && !slide.audioUrl) {
-              const data = await fetchGemini('gemini-2.0-flash-exp', {
+              const data = await fetchGemini('gemini-2.0-flash', {
                 contents: [{ parts: [{ text: script }] }],
                 generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
               }, apiKey);
@@ -224,12 +229,12 @@
                 const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
                 updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
               } else {
-                throw new Error("Failed to generate audio for script.");
+                throw new Error("Failed to generate audio track.");
               }
             }
           } catch (e) {
             console.error(e);
-            alert(`Error on Slide ${slides.indexOf(slide) + 1} (${e.model || 'API'}): ${e.message}`);
+            alert(`Error on Slide ${idx + 1} (${e.model || 'API'}): ${e.message}. Please check your API key / region.`);
           } finally {
             updateSlide(slide.id, { isGenerating: false });
             done++;
@@ -237,6 +242,30 @@
           }
         }
         setTimeout(() => setProgress(null), 2000);
+      };
+
+      const generateSlideAudio = async (slide) => {
+        if (!apiKey) return alert("Please enter your Gemini API Key first.");
+        if (!slide.script) return alert("Please write or generate a script first.");
+        try {
+          updateSlide(slide.id, { isGenerating: true });
+          const data = await fetchGemini('gemini-2.0-flash', {
+            contents: [{ parts: [{ text: slide.script }] }],
+            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice } } } }
+          }, apiKey);
+          const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (part) {
+            const blob = base64ToWav(part.data, parseInt(part.mimeType.match(/rate=(\d+)/)?.[1] || 24000));
+            updateSlide(slide.id, { audioUrl: URL.createObjectURL(blob), audioBlob: blob });
+          } else {
+            throw new Error("Failed to generate audio.");
+          }
+        } catch (e) {
+          console.error(e);
+          alert(`Audio failed (${e.model || 'API'}): ${e.message}`);
+        } finally {
+          updateSlide(slide.id, { isGenerating: false });
+        }
       };
 
       const compileVideo = async () => {
@@ -416,8 +445,21 @@
                       <button onClick={() => setSlides(s => s.filter(x => x.id !== slide.id))} className="text-slate-300 hover:text-red-500"><Trash className="w-5 h-5" /></button>
                     </div>
                     <textarea value={slide.script} onChange={e => updateSlide(slide.id, { script: e.target.value })} placeholder="Write or generate a script..." className="flex-1 w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm resize-none focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
-                    <div className="mt-4 flex justify-end items-center">
-                      {slide.isGenerating ? <Loader className="w-5 h-5 animate-spin text-indigo-600" /> : slide.audioUrl && <button onClick={() => new Audio(slide.audioUrl).play()} className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-all"><Play className="w-3 h-3" /> PREVIEW AUDIO</button>}
+                    <div className="mt-4 flex justify-end items-center gap-3">
+                      {slide.isGenerating ? (
+                        <Loader className="w-5 h-5 animate-spin text-indigo-600" />
+                      ) : (
+                        <>
+                          {slide.audioUrl && (
+                            <button onClick={() => new Audio(slide.audioUrl).play()} className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-all">
+                              <Play className="w-3 h-3" /> LISTEN
+                            </button>
+                          )}
+                          <button onClick={() => generateSlideAudio(slide)} className="flex items-center gap-2 text-indigo-600 font-bold text-xs bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-all">
+                            <Mic className="w-3 h-3" /> {slide.audioUrl ? 'RE-GENERATE VOICE' : 'GENERATE VOICE'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
