@@ -115,16 +115,32 @@
     });
 
     async function fetchGemini(endpoint, payload, key) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent?key=${key}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}:generateContent`;
       console.log(`Fetching Gemini (${endpoint})...`);
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-goog-api-key': (key || '').trim()
+        },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
         let errMsg = `API Error ${res.status}`;
         try { const details = await res.json(); if (details.error) errMsg += `: ${details.error.message}`; } catch(e){}
+        
+        // Auto-fallback system for model 404 unavailability
+        if (res.status === 404) {
+           if (endpoint === 'gemini-1.5-flash') {
+               console.warn("404 on flash, falling back to gemini-1.5-pro...");
+               return fetchGemini('gemini-1.5-pro', payload, key);
+           }
+           if (endpoint === 'gemini-2.0-flash') {
+               console.warn("404 on 2.0-flash, falling back to gemini-2.0-flash-exp...");
+               return fetchGemini('gemini-2.0-flash-exp', payload, key);
+           }
+        }
+
         const error = new Error(errMsg);
         error.status = res.status;
         error.model = endpoint;
