@@ -53,7 +53,7 @@
       try {
         setPreviewLoading(true);
         console.log(`Previewing voice: ${voiceName}...`);
-        const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro'], {
+        const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'], {
           contents: [{ parts: [{ text: `Hello! I am ${voiceName}. I will be the narrator for your presentation.` }] }],
           generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } }
         }, apiKey);
@@ -143,7 +143,12 @@
           return await res.json();
         } catch (e) {
           lastError = e;
-          console.warn(`Fallback: ${endpoint} failed (${e.status}). Trying next...`);
+          if (e.status === 429) {
+            console.warn(`Quota exceeded for ${endpoint}. Waiting 2s before fallback...`);
+            await new Promise(r => setTimeout(r, 2000));
+          } else {
+            console.warn(`Fallback: ${endpoint} failed (${e.status}). Trying next...`);
+          }
           // Retry on 404 (Not Found), 429 (Quota), 500+ (Server Error)
           if (![404, 429, 500, 503, 504].includes(e.status)) break;
         }
@@ -253,7 +258,7 @@
           try {
             updateSlide(slide.id, { isGenerating: true });
             const b64 = await fileToBase64(slide.imageFile);
-            const data = await fetchGemini(['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp', 'gemini-2.0-flash'], {
+            const data = await fetchGemini(['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-exp'], {
               contents: [{ parts: [{ text: "Act as an expert teacher or doctor explaining directly to students. Briefly explain this slide (2-3 sentences). Do NOT start the script with 'This slide explains' or 'Here we can see'. Speak directly about the topic as if giving a live presentation. Only return the script." }, { inlineData: { mimeType: slide.imageFile.type, data: b64 } }] }]
             }, apiKey);
             const script = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
@@ -278,7 +283,7 @@
         for (const slide of toProcess) {
           try {
             updateSlide(slide.id, { isGeneratingVoice: true });
-            const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash'], {
+            const data = await fetchGemini(['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'], {
               contents: [{ parts: [{ text: slide.script }] }],
               generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: slide.voice || globalVoice } } } }
             }, apiKey);
