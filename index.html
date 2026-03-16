@@ -258,7 +258,8 @@
       };
 
       const generateTTS = async (text, voiceName) => {
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?`;
+        // Official Gemini docs: TTS requires gemini-2.5-flash-preview-tts on v1beta
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?`;
         const payload = {
           contents: [{ parts: [{ text }] }],
           generationConfig: {
