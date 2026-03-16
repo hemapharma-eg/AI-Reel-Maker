@@ -227,6 +227,7 @@
       const [userApiKey, setUserApiKey] = useState('');
       const [globalVoice, setGlobalVoice] = useState("Kore");
       const [activeAudio, setActiveAudio] = useState({ id: null, audio: null, isPlaying: false });
+      const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
 
       const [slides, setSlides] = useState([
         { 
@@ -282,52 +283,6 @@
           if (slide && slide.imagePreviewUrl) URL.revokeObjectURL(slide.imagePreviewUrl);
           updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl });
         }
-      };
-
-      const handleTranscriptImport = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        try {
-          let text = "";
-          if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-            const arrayBuffer = await file.arrayBuffer();
-            const result = await mammoth.extractRawText({ arrayBuffer });
-            text = result.value;
-          } else {
-            text = await file.text();
-          }
-
-          const slideMatches = text.split(/\[SLIDE\s+\d+\]/i);
-          const newScripts = slideMatches.slice(1).map(s => s.trim());
-
-          if (newScripts.length > 0) {
-            setSlides(prev => {
-              const updated = [...prev];
-              newScripts.forEach((script, i) => {
-                if (updated[i]) {
-                  updated[i] = { ...updated[i], script };
-                } else {
-                  updated.push({
-                    id: Date.now() + i + Math.random(),
-                    imageFile: null, imagePreviewUrl: null,
-                    script, audioBlob: null, audioUrl: null,
-                    isGenerating: false, voice: globalVoice,
-                    isGeneratingScript: false, scriptGenerationProgress: ""
-                  });
-                }
-              });
-              return updated;
-            });
-            alert(`Imported scripts for ${newScripts.length} slides.`);
-          } else {
-            alert("No [SLIDE X] markers found in the file.");
-          }
-        } catch (err) {
-          console.error("Import failed:", err);
-          alert("Failed to import transcript.");
-        }
-        e.target.value = '';
       };
 
       const handleBulkImageUpload = (e) => {
@@ -392,7 +347,7 @@
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  { text: "Act as an expert educator. Look at this presentation slide and provide a comprehensive, clear, and easy-to-understand explanation for students. Your explanation should be detailed enough that students will not need extra support to understand the concept shown. Aim for a thorough narrative style (about 5-8 sentences) that covers all key details, context, and implications. Return only the script text." },
+                  { text: "Act as an expert educator. Look at this presentation slide and provide a concise, high-impact explanation for students. Your explanation should be clear and professional. Aim for a script about 3-5 sentences long that covers the key concept shown. Return only the script text." },
                   { inlineData: { mimeType: slide.imageFile.type, data: base64Image } }
                 ]
               }]
@@ -468,6 +423,25 @@
         setActiveAudio({ id: null, audio: null, isPlaying: false });
       };
 
+      const previewGlobalVoice = async () => {
+        if (isPreviewingVoice) return;
+        setIsPreviewingVoice(true);
+        try {
+          const sampleText = "Hello! This is a sample of the voice you have selected for your SlideCaster project.";
+          const audioBlob = await generateTTS(sampleText, globalVoice, userApiKey);
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.onended = () => {
+            setIsPreviewingVoice(false);
+            URL.revokeObjectURL(audioUrl);
+          };
+          audio.play();
+        } catch (err) {
+          console.error("Preview failed:", err);
+          setIsPreviewingVoice(false);
+        }
+      };
+
       const compileVideo = async () => {
         if (slides.length === 0) return;
         setIsCompiling(true);
@@ -523,7 +497,6 @@
 
           let isRecording = true;
           let currentSlideVisual = null;
-          let currentSentenceIndex = -1;
 
           const renderLoop = () => {
             if (!isRecording) return;
@@ -549,7 +522,7 @@
               ctx.stroke();
 
               if (currentSlideVisual.sentences && currentSlideVisual.duration > 0) {
-                const elapsed = performance.now() - currentSlideVisual.startTime;
+                const elapsed = performance.now() - currentSlideVisual.nowAtStart;
                 const progress = Math.min(1, Math.max(0, elapsed / currentSlideVisual.duration));
                 const totalSentences = currentSlideVisual.sentences.length;
                 const activeIndex = Math.min(totalSentences - 1, Math.floor(progress * totalSentences));
@@ -596,8 +569,7 @@
             setCompilationProgress(`Slide ${i + 1} / ${slides.length}...`);
             
             const sentenceRegex = /[^.!?]+[.!?]+|\s*$/g;
-            const sentences = (slide.script ? slide.script.match(sentenceRegex) : []) || [];
-            if (sentences.length === 0 && slide.script) sentences.push(slide.script);
+            const sentences = (slide.script ? slide.script.match(sentenceRegex) || [slide.script] : []);
 
             let slideImg = null;
             if (slide.imagePreviewUrl) {
@@ -620,7 +592,7 @@
 
             currentSlideVisual = { 
               img: slideImg, sentences, 
-              duration: audioDurationMs, startTime: performance.now()
+              duration: audioDurationMs, nowAtStart: performance.now()
             };
 
             if (audioBuffer) {
@@ -704,6 +676,11 @@
                 }} className="bg-transparent font-semibold text-indigo-700 outline-none">
                   {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
+                <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                <button onClick={previewGlobalVoice} disabled={isPreviewingVoice} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold transition-colors disabled:opacity-50">
+                  {isPreviewingVoice ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <PlayIcon className="w-3.5 h-3.5" />}
+                  Preview
+                </button>
               </div>
             </div>
           </header>
@@ -715,20 +692,11 @@
               </div>
               <div>
                 <h3 className="font-semibold text-indigo-900 mb-1">How it works</h3>
-                <p className="text-sm text-indigo-800/80 mb-3">Upload your slide images, add scripts, and compile your video.</p>
+                <p className="text-sm text-indigo-800/80 mb-3">Upload slide images, add scripts, and compile your video.</p>
                 <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleBulkImageUpload} />
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
                   <PresentationIcon className="w-4 h-4" /> Bulk Upload Slide Images
                 </button>
-                <div className="flex gap-2">
-                  <button onClick={downloadWordTemplate} className="bg-white border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-all">
-                    <DownloadIcon className="w-4 h-4" /> Download Template
-                  </button>
-                  <label className="bg-white border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-all cursor-pointer">
-                    <UploadIcon className="w-4 h-4" /> Import Transcript
-                    <input type="file" className="hidden" accept=".docx,.doc,.txt" onChange={handleTranscriptImport} />
-                  </label>
-                </div>
               </div>
             </div>
 
