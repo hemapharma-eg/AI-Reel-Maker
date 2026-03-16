@@ -30,7 +30,7 @@
 
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
-    // Safety check for Lucide icons to prevent crash if library version mismatch or missing from CDN
+    const getSafeIcon = (name) => {
       // Hardcoded bulletproof fallbacks for problematic icons
       const fallbacks = {
         ArrowUp: (props) => (
@@ -585,15 +585,10 @@ Please return the result ONLY as a JSON array of strings, like this:
         window.speechSynthesis.speak(utterance);
       };
 
-      const playVoiceSample = (voiceId) => {
+      const playVoiceSample = (voiceName) => {
         const sampleText = "Hello! This is a sample of my voice. I hope it sounds great for your presentation.";
-        const voiceObj = VOICES.find(v => v.id === voiceId);
-        
-        if (voiceObj && voiceObj.provider === 'openai') {
-          alert("OpenAI voice samples require an API key and network request. Browser voices are available for free below.");
-        } else {
-          speakText(sampleText, voiceId);
-        }
+        // Preview with browser voice for now, or just notify
+        speakText(sampleText, voiceName);
       };
 
       const compileVideo = async () => {
