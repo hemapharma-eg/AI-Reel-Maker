@@ -227,6 +227,7 @@
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
       const [userApiKey, setUserApiKey] = useState('');
       const [globalVoice, setGlobalVoice] = useState("Kore");
+      const [projectName, setProjectName] = useState("Untitled Project");
       const [activeAudio, setActiveAudio] = useState({ id: null, audio: null, isPlaying: false });
       const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
       const [quota, setQuota] = useState({ used: 0, limit: 1500, rpm: 0 });
@@ -444,6 +445,75 @@
         setActiveAudio({ id: null, audio: null, isPlaying: false });
       };
 
+      const saveProject = async () => {
+        try {
+          const exportData = {
+            projectName,
+            globalVoice,
+            slides: await Promise.all(slides.map(async s => {
+              let base64 = null;
+              if (s.imageFile) base64 = await fileToBase64(s.imageFile);
+              return {
+                id: s.id,
+                script: s.script,
+                voice: s.voice,
+                imageName: s.imageFile ? s.imageFile.name : null,
+                imageType: s.imageFile ? s.imageFile.type : null,
+                base64
+              };
+            }))
+          };
+          const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${projectName.replace(/\s+/g, '_')}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          console.error("Save failed:", err);
+          alert("Failed to save project.");
+        }
+      };
+
+      const loadProject = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          
+          setProjectName(data.projectName || "Untitled Project");
+          setGlobalVoice(data.globalVoice || "Kore");
+          
+          const restoredSlides = await Promise.all(data.slides.map(async s => {
+            let imageFile = null;
+            let imagePreviewUrl = null;
+            if (s.base64) {
+              const res = await fetch(s.base64);
+              const blob = await res.blob();
+              imageFile = new File([blob], s.imageName || 'image.png', { type: s.imageType || 'image/png' });
+              imagePreviewUrl = URL.createObjectURL(imageFile);
+            }
+            return {
+              id: s.id || Date.now() + Math.random(),
+              imageFile,
+              imagePreviewUrl,
+              script: s.script || "",
+              voice: s.voice || data.globalVoice || "Kore",
+              audioBlob: null, audioUrl: null,
+              isGenerating: false, isGeneratingScript: false, scriptGenerationProgress: ""
+            };
+          }));
+          setSlides(restoredSlides);
+          alert("Project loaded successfully.");
+        } catch (err) {
+          console.error("Load failed:", err);
+          alert("Failed to load project file.");
+        }
+        e.target.value = '';
+      };
+
       const previewGlobalVoice = async () => {
         if (isPreviewingVoice) return;
         setIsPreviewingVoice(true);
@@ -635,25 +705,44 @@
           <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
             <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
-                  <VideoIcon className="text-white w-5 h-5" />
+                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                  <PlayIcon className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-xl font-bold text-slate-900">SlideCaster</h1>
+                <div className="flex flex-col">
+                  <h1 className="text-xl font-bold text-slate-900 leading-none mb-1">SlideCaster</h1>
+                  <input 
+                    value={projectName} 
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="text-xs font-semibold text-slate-500 bg-transparent outline-none focus:text-indigo-600 hover:text-slate-700 transition-colors border-b border-transparent focus:border-indigo-200"
+                    placeholder="Project Name..."
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                <SettingsIcon className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-600 font-medium">Global Voice:</span>
-                <select value={globalVoice} onChange={(e) => {
-                  setGlobalVoice(e.target.value);
-                  setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
-                }} className="bg-transparent font-semibold text-indigo-700 outline-none">
-                  {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
-                <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                <button onClick={previewGlobalVoice} disabled={isPreviewingVoice} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold transition-colors disabled:opacity-50">
-                  {isPreviewingVoice ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <PlayIcon className="w-3.5 h-3.5" />}
-                  Preview
-                </button>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <SettingsIcon className="w-4 h-4 text-slate-500" />
+                  <span className="text-slate-600 font-medium">Global Voice:</span>
+                  <select value={globalVoice} onChange={(e) => {
+                    setGlobalVoice(e.target.value);
+                    setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
+                  }} className="bg-transparent font-semibold text-indigo-700 outline-none">
+                    {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                  <button onClick={previewGlobalVoice} disabled={isPreviewingVoice} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold transition-colors disabled:opacity-50">
+                    {isPreviewingVoice ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <PlayIcon className="w-3.5 h-3.5" />}
+                    Preview
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={saveProject} className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm">
+                    <DownloadIcon className="w-4 h-4" /> Save
+                  </button>
+                  <label className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
+                    <UploadIcon className="w-4 h-4" /> Load
+                    <input type="file" accept=".json" className="hidden" onChange={loadProject} />
+                  </label>
+                </div>
               </div>
             </div>
             {refillTime && (
