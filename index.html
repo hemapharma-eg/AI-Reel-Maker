@@ -294,29 +294,18 @@
           return { ok: false, step: 'Key Check', error: e.message };
         }
 
-        // Step 2: Test a real generateContent call (cheapest possible)
-        console.log(`[SlideCaster] Step 2: Testing generateContent with gemini-2.0-flash...`);
-        try {
-          const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache, no-store',
-              'Pragma': 'no-cache'
-            },
-            cache: 'no-store',
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: "Say OK" }] }]
-            })
-          });
-          
-          if (!testRes.ok) {
-            const body = await testRes.text().catch(() => '');
-            console.error(`[SlideCaster] Test call failed HTTP ${testRes.status}:`, body);
-            
-            // If gemini-2.0-flash fails, try gemini-1.5-flash
-            console.log(`[SlideCaster] Step 2b: Trying fallback gemini-1.5-flash...`);
-            const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        // Step 2: Try multiple models until one works
+        const modelsToTry = [
+          'gemini-2.0-flash',
+          'gemini-2.0-flash-lite',
+          'gemini-1.5-flash-latest',
+          'gemini-1.5-flash-8b'
+        ];
+        
+        for (const model of modelsToTry) {
+          console.log(`[SlideCaster] Step 2: Testing ${model}...`);
+          try {
+            const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -329,20 +318,27 @@
               })
             });
             
-            if (!fallbackRes.ok) {
-              const fbBody = await fallbackRes.text().catch(() => '');
-              return { ok: false, step: 'API Test', error: `Both gemini-2.0-flash (${testRes.status}) and gemini-1.5-flash (${fallbackRes.status}) failed.\n\nGoogle says: ${body.substring(0, 200)}`, useModel: null };
+            if (testRes.ok) {
+              console.log(`[SlideCaster] ✅ ${model} works!`);
+              return { ok: true, useModel: model };
             }
             
-            console.log('[SlideCaster] Fallback gemini-1.5-flash works!');
-            return { ok: true, useModel: 'gemini-1.5-flash' };
+            const body = await testRes.text().catch(() => '');
+            console.warn(`[SlideCaster] ❌ ${model} → HTTP ${testRes.status}`);
+            
+            // If last model also fails, report detailed error
+            if (model === modelsToTry[modelsToTry.length - 1]) {
+              return { ok: false, step: 'API Test', error: `All models failed. Last error (${model}, HTTP ${testRes.status}):\n\n${body.substring(0, 300)}` };
+            }
+          } catch (e) {
+            console.warn(`[SlideCaster] ${model} network error:`, e.message);
+            if (model === modelsToTry[modelsToTry.length - 1]) {
+              return { ok: false, step: 'API Test', error: `All models failed. Last error: ${e.message}` };
+            }
           }
-          
-          console.log('[SlideCaster] gemini-2.0-flash works!');
-          return { ok: true, useModel: 'gemini-2.0-flash' };
-        } catch (e) {
-          return { ok: false, step: 'API Test', error: e.message };
         }
+        
+        return { ok: false, step: 'API Test', error: 'All models exhausted' };
       };
 
       // Store which model works for this session
