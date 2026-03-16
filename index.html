@@ -372,8 +372,9 @@
           });
 
           if (response.status === 429) {
-            setRefillTime("Rate limit reached. Please wait a minute for your quota to refill.");
-            throw new Error("Quota exceeded (429).");
+            const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
+            setRefillTime(`Quota exceeded for key ${maskedKey}. Please wait or change key.`);
+            throw new Error(`Quota exceeded (429) for key ${maskedKey}.`);
           }
 
           if (!response.ok) {
@@ -410,11 +411,21 @@
           updateSlide(id, { audioBlob, audioUrl, isGenerating: false });
         } catch (error) {
           console.error("Audio generation failed:", error);
-          if (error.message === "429") {
-            setRefillTime("Rate limit reached. Please wait a minute for your quota to refill.");
+          const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
+          if (error.message.includes("429")) {
+            setRefillTime(`Quota exceeded for key ${maskedKey}. Please wait or change key.`);
           }
           updateSlide(id, { isGenerating: false });
-          alert("Failed to generate audio. Please check your script and API key.");
+          alert(`Failed to generate audio (Key: ${maskedKey}). ${error.message}`);
+        }
+      };
+
+      const changeApiKey = () => {
+        const newKey = prompt("Enter your new Gemini API Key:", userApiKey);
+        if (newKey !== null && newKey.trim() !== "") {
+          setUserApiKey(newKey.trim());
+          setAiStatus('ready');
+          alert("API Key updated successfully.");
         }
       };
 
@@ -754,6 +765,13 @@
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key ID:</span>
+                    <span className="text-xs font-mono text-slate-600">
+                      {userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : 'None'}
+                    </span>
+                    <button onClick={changeApiKey} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider ml-1 hover:underline">Change</button>
+                  </div>
                   <button 
                     onClick={saveProject} 
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${!isProjectNameValid() ? 'bg-rose-50 border border-rose-100 text-rose-400 cursor-not-allowed opacity-70' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-200'}`}
