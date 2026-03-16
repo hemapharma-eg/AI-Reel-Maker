@@ -445,7 +445,13 @@
         setActiveAudio({ id: null, audio: null, isPlaying: false });
       };
 
+      const isProjectNameValid = () => projectName.trim() && projectName !== "Untitled Project";
+
       const saveProject = async () => {
+        if (!isProjectNameValid()) {
+          alert("Please give your project a clear and unique name before saving.");
+          return;
+        }
         try {
           const exportData = {
             projectName,
@@ -483,14 +489,21 @@
           const text = await file.text();
           const data = JSON.parse(text);
           
-          setProjectName(data.projectName || "Untitled Project");
+          if (!data.projectName || data.projectName === "Untitled Project") {
+             alert("The uploaded file does not have a valid project name.");
+             e.target.value = '';
+             return;
+          }
+
+          setProjectName(data.projectName);
           setGlobalVoice(data.globalVoice || "Kore");
           
           const restoredSlides = await Promise.all(data.slides.map(async s => {
             let imageFile = null;
             let imagePreviewUrl = null;
             if (s.base64) {
-              const res = await fetch(s.base64);
+              const dataUrl = `data:${s.imageType || 'image/png'};base64,${s.base64}`;
+              const res = await fetch(dataUrl);
               const blob = await res.blob();
               imageFile = new File([blob], s.imageName || 'image.png', { type: s.imageType || 'image/png' });
               imagePreviewUrl = URL.createObjectURL(imageFile);
@@ -713,8 +726,8 @@
                   <input 
                     value={projectName} 
                     onChange={(e) => setProjectName(e.target.value)}
-                    className="text-xs font-semibold text-slate-500 bg-transparent outline-none focus:text-indigo-600 hover:text-slate-700 transition-colors border-b border-transparent focus:border-indigo-200"
-                    placeholder="Project Name..."
+                    className={`text-xs font-semibold bg-transparent outline-none transition-all border-b ${!isProjectNameValid() ? 'text-rose-500 border-rose-300 placeholder-rose-300 animate-pulse' : 'text-slate-500 border-transparent focus:text-indigo-600 focus:border-indigo-200 hover:text-slate-700'}`}
+                    placeholder="Enter Project Name (Required)..."
                   />
                 </div>
               </div>
@@ -735,7 +748,10 @@
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={saveProject} className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm">
+                  <button 
+                    onClick={saveProject} 
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all shadow-sm ${!isProjectNameValid() ? 'bg-rose-50 border border-rose-100 text-rose-400 cursor-not-allowed opacity-70' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-200'}`}
+                  >
                     <DownloadIcon className="w-4 h-4" /> Save
                   </button>
                   <label className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm cursor-pointer">
