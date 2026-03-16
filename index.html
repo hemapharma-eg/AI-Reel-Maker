@@ -10,7 +10,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   
@@ -50,10 +50,16 @@
       if (fallbacks[name]) return fallbacks[name];
       const Lib = (typeof LucideReact !== 'undefined' ? LucideReact : (typeof lucide !== 'undefined' ? lucide : null));
       if (Lib) {
-        if (Lib[name]) return Lib[name];
-        if (Lib.icons && Lib.icons[name]) return Lib.icons[name];
+        // In Lucide React, components are functions. 
+        // In vanilla Lucide, they are objects (which causes Error #130).
+        const icon = Lib[name] || (Lib.icons && Lib.icons[name]);
+        if (typeof icon === 'function' || typeof icon === 'string') return icon;
+
+        // Try case insensitive lookup
         const lowerName = name.toLowerCase();
-        for (let key in Lib) { if (key.toLowerCase() === lowerName) return Lib[key]; }
+        for (let key in Lib) { 
+          if (key.toLowerCase() === lowerName && (typeof Lib[key] === 'function')) return Lib[key]; 
+        }
       }
       return (props) => (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
