@@ -220,40 +220,68 @@
 
       const fileInputRef = useRef(null);
 
-      // --- Professional Stability Layer ---
-      const safeGeminiFetch = async (url, payload, maxRetries = 5) => {
-        let delay = 2000;
+      // --- Professional API Layer with Full Diagnostics ---
+      const safeGeminiFetch = async (url, payload, maxRetries = 4) => {
+        let delay = 3000;
         const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
+        const fullUrl = url + `key=${userApiKey}`;
+        console.log(`[SlideCaster API] Calling: ${url}key=${maskedKey}`);
 
         for (let i = 0; i < maxRetries; i++) {
           try {
-            const res = await fetch(url + `&key=${userApiKey}`, {
+            const res = await fetch(fullUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
 
-            if (res.status === 429) {
-              if (i === maxRetries - 1) throw new Error(`Quota Exceeded (429) for key ${maskedKey} after ${maxRetries} attempts.`);
-              const waitSec = Math.round(delay / 1000);
-              setRefillTime(`Quota hit. Professional Retry Logic: Waiting ${waitSec}s... (Attempt ${i + 1}/${maxRetries - 1})`);
-              await new Promise(r => setTimeout(r, delay));
-              delay *= 2;
-              continue;
-            }
-
+            // --- Full diagnostic capture for ANY error ---
             if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}));
-              throw new Error(errorData.error?.message || `API Error: ${res.status}`);
+              const errorBody = await res.text().catch(() => 'No response body');
+              console.error(`[SlideCaster API] Status ${res.status}:`, errorBody);
+              let parsedError;
+              try { parsedError = JSON.parse(errorBody); } catch(e) { parsedError = null; }
+              const apiMessage = parsedError?.error?.message || errorBody.substring(0, 200);
+              
+              if (res.status === 429) {
+                if (i === maxRetries - 1) {
+                  throw new Error(`API returned 429. Full diagnostic: ${apiMessage}`);
+                }
+                const waitSec = Math.round(delay / 1000);
+                setRefillTime(`Rate limited. Retrying in ${waitSec}s... (${i + 1}/${maxRetries})`);
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+                continue;
+              }
+              throw new Error(`API Error ${res.status}: ${apiMessage}`);
             }
 
             setRefillTime(null);
             return await res.json();
           } catch (err) {
-            if (err.message.includes("429") || i === maxRetries - 1) throw err;
+            console.error(`[SlideCaster API] Attempt ${i+1} failed:`, err.message);
+            if (i === maxRetries - 1) throw err;
+            if (!err.message.includes('429')) throw err;
             await new Promise(r => setTimeout(r, delay));
-            delay *= 1.5;
+            delay *= 2;
           }
+        }
+      };
+
+      // --- API Key Validation on Startup ---
+      const validateApiKey = async (key) => {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+          if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            console.error('[SlideCaster] Key validation failed:', res.status, body);
+            return { valid: false, status: res.status, message: body };
+          }
+          const data = await res.json();
+          console.log('[SlideCaster] Key valid. Available models:', data.models?.map(m => m.name).join(', '));
+          return { valid: true, models: data.models?.map(m => m.name) || [] };
+        } catch (err) {
+          return { valid: false, status: 0, message: err.message };
         }
       };
 
@@ -283,11 +311,18 @@
         return base64ToWav(part.data, rate);
       };
 
-      const startWithAI = () => {
+      const startWithAI = async () => {
         if (!userApiKey.trim()) {
           alert("Please enter a valid Gemini API Key.");
           return;
         }
+        // Validate key before proceeding
+        const result = await validateApiKey(userApiKey.trim());
+        if (!result.valid) {
+          alert(`API Key validation failed (${result.status}): ${result.message?.substring(0, 200)}\n\nPlease check your key and try again.`);
+          return;
+        }
+        console.log('[SlideCaster] Key validated successfully!');
         setAiStatus('ready');
         setView('app');
       };
@@ -374,7 +409,8 @@
           const base64Image = await fileToBase64(slide.imageFile);
           setQuota(q => ({ ...q, used: q.used + 1, rpm: q.rpm + 1 }));
           
-          const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?`;
+          // Use v1beta for multimodal (image) requests — v1 may reject free-tier image calls
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?`;
           const payload = {
             contents: [{
               parts: [
