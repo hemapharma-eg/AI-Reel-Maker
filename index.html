@@ -679,18 +679,18 @@ Please return the result ONLY as a JSON array of strings, like this:
               
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 <button 
-                  onClick={copyAiPrompt}
+                  onClick={downloadWordTemplate}
                   className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
                 >
-                  <Copy className="w-3.5 h-3.5 text-indigo-500" />
-                  Copy AI Prompt
+                  <Download className="w-3.5 h-3.5 text-blue-500" />
+                  Download Word Template
                 </button>
                 <button 
-                  onClick={() => setShowImportModal(true)}
+                  onClick={() => setShowVoiceModal(true)}
                   className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
                 >
-                  <Clipboard className="w-3.5 h-3.5 text-emerald-500" />
-                  Bulk Import Scripts
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  Professional Voice Gallery
                 </button>
                 <button 
                   onClick={() => audioBulkInputRef.current?.click()}
