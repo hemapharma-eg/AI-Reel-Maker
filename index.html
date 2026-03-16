@@ -68,8 +68,8 @@
       if (fallbacks[name]) return fallbacks[name];
       const Lib = (typeof LucideReact !== 'undefined' ? LucideReact : (typeof lucide !== 'undefined' ? lucide : null));
       if (Lib) {
-        // In Lucide React UMD, icons might be directly on the global
-        const icon = Lib[name] || (Lib.icons && Lib.icons[name]) || window[name];
+        // In Lucide React UMD, icons might be directly on the global LucideReact object
+        const icon = Lib[name] || (Lib.icons && Lib.icons[name]);
         if (typeof icon === 'function' || typeof icon === 'string') return icon;
 
         const lowerName = name.toLowerCase();
@@ -82,21 +82,21 @@
       );
     };
 
-    const Play = getSafeIcon('Play');
-    const Video = getSafeIcon('Video');
-    const Plus = getSafeIcon('Plus');
-    const Trash2 = getSafeIcon('Trash2');
-    const Presentation = getSafeIcon('Presentation');
-    const Mic = getSafeIcon('Mic');
-    const Download = getSafeIcon('Download');
-    const Loader2 = getSafeIcon('Loader2');
-    const Upload = getSafeIcon('Upload');
-    const Settings = getSafeIcon('Settings');
-    const Sparkles = getSafeIcon('Sparkles');
-    const ChevronUp = getSafeIcon('ArrowUp');
-    const ChevronDown = getSafeIcon('ArrowDown');
+    const PlayIcon = getSafeIcon('Play');
+    const VideoIcon = getSafeIcon('Video');
+    const PlusIcon = getSafeIcon('Plus');
+    const TrashIcon = getSafeIcon('Trash2');
+    const PresentationIcon = getSafeIcon('Presentation');
+    const MicIcon = getSafeIcon('Mic');
+    const DownloadIcon = getSafeIcon('Download');
+    const LoaderIcon = getSafeIcon('Loader2');
+    const UploadIcon = getSafeIcon('Upload');
+    const SettingsIcon = getSafeIcon('Settings');
+    const SparklesIcon = getSafeIcon('Sparkles');
+    const ChevronUpIcon = getSafeIcon('ArrowUp');
+    const ChevronDownIcon = getSafeIcon('ArrowDown');
     const XIcon = getSafeIcon('X');
-    const Check = getSafeIcon('Check');
+    const CheckIcon = getSafeIcon('Check');
 
     const VOICES = [
       "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", 
@@ -597,12 +597,12 @@
             <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
-                  <Video className="text-white w-5 h-5" />
+                  <VideoIcon className="text-white w-5 h-5" />
                 </div>
                 <h1 className="text-xl font-bold text-slate-900">SlideCaster</h1>
               </div>
               <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                <Settings className="w-4 h-4 text-slate-500" />
+                <SettingsIcon className="w-4 h-4 text-slate-500" />
                 <span className="text-slate-600 font-medium">Global Voice:</span>
                 <select value={globalVoice} onChange={(e) => {
                   setGlobalVoice(e.target.value);
@@ -617,14 +617,14 @@
           <main className="max-w-5xl mx-auto px-6 py-8 flex-grow w-full">
             <div className="mb-8 bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex gap-4">
               <div className="mt-1 bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center">
-                <Upload className="w-4 h-4 text-indigo-600" />
+                <UploadIcon className="w-4 h-4 text-indigo-600" />
               </div>
               <div>
                 <h3 className="font-semibold text-indigo-900 mb-1">How it works</h3>
                 <p className="text-sm text-indigo-800/80 mb-3">Upload your slide images, add scripts, and compile your video.</p>
                 <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleBulkImageUpload} />
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
-                  <Presentation className="w-4 h-4" /> Bulk Upload Slide Images
+                  <PresentationIcon className="w-4 h-4" /> Bulk Upload Slide Images
                 </button>
               </div>
             </div>
@@ -638,14 +638,14 @@
                         <img src={slide.imagePreviewUrl} alt={`Slide ${index + 1}`} className="max-h-full max-w-full rounded shadow-sm object-contain" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                           <label className="cursor-pointer bg-white text-slate-800 text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 hover:bg-slate-50 transition-all">
-                            <Upload className="w-4 h-4" /> Change Image
+                            <UploadIcon className="w-4 h-4" /> Change Image
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                           </label>
                         </div>
                       </>
                     ) : (
                       <label className="cursor-pointer w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-all">
-                        <Presentation className="w-8 h-8 mb-2 opacity-50" />
+                        <PresentationIcon className="w-8 h-8 mb-2 opacity-50" />
                         <span className="text-sm font-medium text-center">Upload Slide Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                       </label>
@@ -655,12 +655,12 @@
 
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Mic className="w-4 h-4 text-slate-400" /> Voiceover Script</label>
+                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-2"><MicIcon className="w-4 h-4 text-slate-400" /> Voiceover Script</label>
                       <div className="flex items-center gap-2">
                         <button onClick={() => autoGenerateScript(slide.id)} disabled={!slide.imagePreviewUrl || slide.isGeneratingScript || aiStatus !== 'ready'} className="text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                          {slide.isGeneratingScript ? <><Loader2 className="w-3 h-3 animate-spin"/> {slide.scriptGenerationProgress}</> : <><Sparkles className="w-3 h-3"/> AI Script</>}
+                          {slide.isGeneratingScript ? <><LoaderIcon className="w-3 h-3 animate-spin"/> {slide.scriptGenerationProgress}</> : <><SparklesIcon className="w-3 h-3"/> AI Script</>}
                         </button>
-                        <button onClick={() => handleRemoveSlide(slide.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4"/></button>
+                        <button onClick={() => handleRemoveSlide(slide.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><TrashIcon className="w-4 h-4"/></button>
                       </div>
                     </div>
                     <textarea value={slide.script} onChange={(e) => updateSlide(slide.id, { script: e.target.value })} className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400" placeholder="Type the script here..."/>
@@ -669,9 +669,9 @@
                         {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                       <div className="flex items-center gap-2">
-                        {slide.audioUrl && <button onClick={() => playAudio(slide.audioUrl)} className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200"><Play className="w-4 h-4 ml-0.5"/></button>}
+                        {slide.audioUrl && <button onClick={() => playAudio(slide.audioUrl)} className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200"><PlayIcon className="w-4 h-4 ml-0.5"/></button>}
                         <button onClick={() => generateAudioForSlide(slide.id)} disabled={!(slide.script || "").trim() || slide.isGenerating} className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-2">
-                          {slide.isGenerating ? <><Loader2 className="w-4 h-4 animate-spin"/> Generating...</> : <><Mic className="w-4 h-4"/> Generate Voice</>}
+                          {slide.isGenerating ? <><LoaderIcon className="w-4 h-4 animate-spin"/> Generating...</> : <><MicIcon className="w-4 h-4"/> Generate Voice</>}
                         </button>
                       </div>
                     </div>
@@ -679,7 +679,7 @@
                 </div>
               ))}
               <button onClick={handleAddSlide} className="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 font-medium flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-600 transition-all">
-                <Plus className="w-5 h-5"/> Add Another Slide
+                <PlusIcon className="w-5 h-5"/> Add Another Slide
               </button>
             </div>
           </main>
@@ -688,7 +688,7 @@
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
               <div className="text-sm text-slate-500 font-medium">Total Slides: <span className="text-slate-900">{slides.length}</span></div>
               <button onClick={compileVideo} disabled={isCompiling || slides.length === 0} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white font-semibold px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                {isCompiling ? <><Loader2 className="w-5 h-5 animate-spin"/> {compilationProgress}</> : <><Video className="w-5 h-5"/> Compile Video</>}
+                {isCompiling ? <><LoaderIcon className="w-5 h-5 animate-spin"/> {compilationProgress}</> : <><VideoIcon className="w-5 h-5"/> Compile Video</>}
               </button>
             </div>
           </footer>
@@ -712,7 +712,7 @@
                 </div>
                 <div className="p-6 flex justify-end gap-3 bg-slate-50 border-t border-slate-100">
                   <button onClick={() => setFinalVideoUrl(null)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-all">Back to Editor</button>
-                  <a href={finalVideoUrl} download={`Video.${finalExtension}`} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all"><Download className="w-5 h-5"/> Download Video</a>
+                  <a href={finalVideoUrl} download={`Video.${finalExtension}`} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all"><DownloadIcon className="w-5 h-5"/> Download Video</a>
                 </div>
               </div>
             </div>
