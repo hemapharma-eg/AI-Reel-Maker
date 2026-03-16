@@ -197,6 +197,30 @@
       reader.onerror = error => reject(error);
     });
 
+    function downloadWordTemplate() {
+      const xmlHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+      <?mso-application progid="Word.Document"?>
+      <w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">
+        <w:body>
+          <w:p><w:r><w:t>SlideCaster Script Template</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Please type your scripts below each slide marker. Do not change the [SLIDE X] format.</w:t></w:r></w:p>
+          <w:p><w:r><w:t /></w:r></w:p>
+          <w:p><w:r><w:t>[SLIDE 1]</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Hello, this is my first slide script.</w:t></w:r></w:p>
+          <w:p><w:r><w:t /></w:r></w:p>
+          <w:p><w:r><w:t>[SLIDE 2]</w:t></w:r></w:p>
+          <w:p><w:r><w:t>This is my second slide script.</w:t></w:r></w:p>
+        </w:body>
+      </w:wordDocument>`;
+      const blob = new Blob(["\ufeff", xmlHeader], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'SlideCaster_Template.doc';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
     function SlideCasterApp() {
       const [view, setView] = useState('home'); // 'home' or 'app'
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
@@ -253,8 +277,56 @@
         if (files && files.length > 0) {
           const file = files[0];
           const previewUrl = URL.createObjectURL(file);
+          const slide = slides.find(s => s.id === id);
+          if (slide && slide.imagePreviewUrl) URL.revokeObjectURL(slide.imagePreviewUrl);
           updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl });
         }
+      };
+
+      const handleTranscriptImport = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+          let text = "";
+          if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            text = result.value;
+          } else {
+            text = await file.text();
+          }
+
+          const slideMatches = text.split(/\[SLIDE\s+\d+\]/i);
+          const newScripts = slideMatches.slice(1).map(s => s.trim());
+
+          if (newScripts.length > 0) {
+            setSlides(prev => {
+              const updated = [...prev];
+              newScripts.forEach((script, i) => {
+                if (updated[i]) {
+                  updated[i] = { ...updated[i], script };
+                } else {
+                  updated.push({
+                    id: Date.now() + i + Math.random(),
+                    imageFile: null, imagePreviewUrl: null,
+                    script, audioBlob: null, audioUrl: null,
+                    isGenerating: false, voice: globalVoice,
+                    isGeneratingScript: false, scriptGenerationProgress: ""
+                  });
+                }
+              });
+              return updated;
+            });
+            alert(`Imported scripts for ${newScripts.length} slides.`);
+          } else {
+            alert("No [SLIDE X] markers found in the file.");
+          }
+        } catch (err) {
+          console.error("Import failed:", err);
+          alert("Failed to import transcript.");
+        }
+        e.target.value = '';
       };
 
       const handleBulkImageUpload = (e) => {
@@ -626,6 +698,15 @@
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
                   <PresentationIcon className="w-4 h-4" /> Bulk Upload Slide Images
                 </button>
+                <div className="flex gap-2">
+                  <button onClick={downloadWordTemplate} className="bg-white border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-all">
+                    <DownloadIcon className="w-4 h-4" /> Download Template
+                  </button>
+                  <label className="bg-white border border-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-all cursor-pointer">
+                    <UploadIcon className="w-4 h-4" /> Import Transcript
+                    <input type="file" className="hidden" accept=".docx,.doc,.txt" onChange={handleTranscriptImport} />
+                  </label>
+                </div>
               </div>
             </div>
 
