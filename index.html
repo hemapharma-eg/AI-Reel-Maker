@@ -830,6 +830,21 @@
               <p className="text-slate-600 mb-6 text-sm leading-relaxed">
                 To use automatic slide script generation, please provide your Gemini API Key.
               </p>
+              <div className="mb-6 text-left bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
+                  <PlayIcon className="w-4 h-4 text-indigo-600" /> How to get your FREE key:
+                </h3>
+                <ol className="text-xs text-slate-600 space-y-2 ml-4 list-decimal leading-relaxed">
+                  <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 font-bold hover:underline">Google AI Studio</a></li>
+                  <li>Click <strong>"Get API key"</strong> (it's completely free)</li>
+                  <li>Copy the key and paste it below.</li>
+                </ol>
+                <div className="mt-3 p-2 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-2">
+                  <span className="text-rose-500 font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-rose-200 uppercase">Warning</span>
+                  <p className="text-[10px] text-rose-700 font-medium leading-tight">Your API key is private like a password. <strong>Do not share it with anyone.</strong></p>
+                </div>
+              </div>
+
               <div className="mb-8 text-left">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Gemini API Key</label>
                 <input 
@@ -837,7 +852,7 @@
                   value={userApiKey}
                   onChange={(e) => setUserApiKey(e.target.value)}
                   placeholder="AIzaSy..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
               </div>
               <div className="flex flex-col gap-3">
