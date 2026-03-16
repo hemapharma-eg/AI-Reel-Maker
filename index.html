@@ -31,7 +31,32 @@
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
     // Safety check for Lucide icons to prevent crash if library version mismatch or missing from CDN
-    const getSafeIcon = (name) => {
+      // Hardcoded bulletproof fallbacks for problematic icons
+      const fallbacks = {
+        ArrowUp: (props) => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="m18 15-6-6-6 6"/>
+          </svg>
+        ),
+        ArrowDown: (props) => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="m6 9 6 6 6-6"/>
+          </svg>
+        ),
+        X: (props) => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+          </svg>
+        ),
+        Check: (props) => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        )
+      };
+
+      if (fallbacks[name]) return fallbacks[name];
+
       // Try multiple possible global names used by various CDN versions
       const Lib = (typeof LucideReact !== 'undefined' ? LucideReact : (typeof lucide !== 'undefined' ? lucide : null));
       
@@ -47,7 +72,7 @@
         }
       }
 
-      // Final bulletproof fallback: Simple SVG icon so the app never crashes
+      // Final bulletproof fallback: Simple Alert icon
       return (props) => (
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
           <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
@@ -292,24 +317,35 @@
       };
 
       const downloadWordTemplate = () => {
-        // More robust approach for Word compatibility: use specific headers and a BOM
+        // Robust approach for Word: use a specific XML envelope that Word recognizes immediately
         const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-          <head><meta charset='utf-8'><title>SlideCaster Transcript Template</title></head><body>
+          <head>
+            <!--[if gte mso 9]>
+            <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml>
+            <![endif]-->
+            <meta charset='utf-8'>
+            <style>
+              table { border-collapse: collapse; width: 100%; border: 1px solid #ddd; }
+              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-family: sans-serif; }
+              th { background-color: #f1f5f9; font-weight: bold; }
+            </style>
+          </head>
+          <body>
           <h2>SlideCaster Transcript Template</h2>
-          <p>Fill in the table below and upload it back to SlideCaster. Do not change the column order.</p>
-          <table border='1' style='border-collapse:collapse; width:100%'>
-            <tr style='background-color:#f1f5f9'><th>Slide #</th><th>Transcript (Speak this)</th></tr>`;
+          <p>Fill in the table below. Do not change the column order.</p>
+          <table>
+            <tr><th style='width:80px'>Slide #</th><th>Transcript (Speak this)</th></tr>`;
         
         let rows = "";
         const rowCount = slides.length > 0 ? slides.length : 10;
         for (let i = 1; i <= rowCount; i++) {
-          rows += `<tr><td style='width:80px; text-align:center'>${i}</td><td></td></tr>`;
+          rows += `<tr><td style='text-align:center'>${i}</td><td></td></tr>`;
         }
         
         const footer = "</table></body></html>";
         const content = header + rows + footer;
         
-        // Add Byte Order Mark (BOM) for UTF-8 compatibility with Word
+        // Add Byte Order Mark (BOM) for UTF-8 compatibility and serve with correct MIME
         const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
