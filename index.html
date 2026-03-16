@@ -225,41 +225,45 @@
         let delay = 3000;
         const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
         const fullUrl = url + `key=${userApiKey}`;
-        console.log(`[SlideCaster API] Calling: ${url}key=${maskedKey}`);
+        console.log(`[SlideCaster API] Request to: ${url}key=${maskedKey}`);
 
         for (let i = 0; i < maxRetries; i++) {
           try {
             const res = await fetch(fullUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store',
+                'Pragma': 'no-cache'
+              },
+              cache: 'no-store',
               body: JSON.stringify(payload)
             });
 
-            // --- Full diagnostic capture for ANY error ---
             if (!res.ok) {
               const errorBody = await res.text().catch(() => 'No response body');
-              console.error(`[SlideCaster API] Status ${res.status}:`, errorBody);
+              console.error(`[SlideCaster API] HTTP ${res.status}:`, errorBody);
               let parsedError;
               try { parsedError = JSON.parse(errorBody); } catch(e) { parsedError = null; }
-              const apiMessage = parsedError?.error?.message || errorBody.substring(0, 200);
+              const apiMessage = parsedError?.error?.message || errorBody.substring(0, 300);
               
               if (res.status === 429) {
                 if (i === maxRetries - 1) {
-                  throw new Error(`API returned 429. Full diagnostic: ${apiMessage}`);
+                  throw new Error(`Rate limit (429). Google says: "${apiMessage}"`);
                 }
                 const waitSec = Math.round(delay / 1000);
-                setRefillTime(`Rate limited. Retrying in ${waitSec}s... (${i + 1}/${maxRetries})`);
+                setRefillTime(`Rate limited. Auto-retrying in ${waitSec}s... (${i + 1}/${maxRetries})`);
                 await new Promise(r => setTimeout(r, delay));
                 delay *= 2;
                 continue;
               }
-              throw new Error(`API Error ${res.status}: ${apiMessage}`);
+              throw new Error(`HTTP ${res.status}: ${apiMessage}`);
             }
 
             setRefillTime(null);
             return await res.json();
           } catch (err) {
-            console.error(`[SlideCaster API] Attempt ${i+1} failed:`, err.message);
+            console.error(`[SlideCaster API] Attempt ${i+1} error:`, err.message);
             if (i === maxRetries - 1) throw err;
             if (!err.message.includes('429')) throw err;
             await new Promise(r => setTimeout(r, delay));
@@ -268,61 +272,99 @@
         }
       };
 
-      // --- API Key Validation on Startup ---
-      const validateApiKey = async (key) => {
+      // --- Full Diagnostic: validates key AND tests a real generateContent call ---
+      const validateAndTestKey = async (key) => {
+        const maskedKey = key ? `${key.substring(0, 6)}...${key.slice(-4)}` : "None";
+        
+        // Step 1: List models (basic key validation)
+        console.log(`[SlideCaster] Step 1: Validating key ${maskedKey}...`);
         try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-          if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            console.error('[SlideCaster] Key validation failed:', res.status, body);
-            return { valid: false, status: res.status, message: body };
+          const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, {
+            headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
+            cache: 'no-store'
+          });
+          if (!listRes.ok) {
+            const body = await listRes.text().catch(() => '');
+            return { ok: false, step: 'Key Check', error: `HTTP ${listRes.status}: ${body.substring(0, 200)}` };
           }
-          const data = await res.json();
-          console.log('[SlideCaster] Key valid. Available models:', data.models?.map(m => m.name).join(', '));
-          return { valid: true, models: data.models?.map(m => m.name) || [] };
-        } catch (err) {
-          return { valid: false, status: 0, message: err.message };
+          const listData = await listRes.json();
+          const modelNames = listData.models?.map(m => m.name) || [];
+          console.log('[SlideCaster] Key valid. Models available:', modelNames.length);
+        } catch (e) {
+          return { ok: false, step: 'Key Check', error: e.message };
+        }
+
+        // Step 2: Test a real generateContent call (cheapest possible)
+        console.log(`[SlideCaster] Step 2: Testing generateContent with gemini-2.0-flash...`);
+        try {
+          const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store',
+              'Pragma': 'no-cache'
+            },
+            cache: 'no-store',
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: "Say OK" }] }]
+            })
+          });
+          
+          if (!testRes.ok) {
+            const body = await testRes.text().catch(() => '');
+            console.error(`[SlideCaster] Test call failed HTTP ${testRes.status}:`, body);
+            
+            // If gemini-2.0-flash fails, try gemini-1.5-flash
+            console.log(`[SlideCaster] Step 2b: Trying fallback gemini-1.5-flash...`);
+            const fallbackRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store',
+                'Pragma': 'no-cache'
+              },
+              cache: 'no-store',
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: "Say OK" }] }]
+              })
+            });
+            
+            if (!fallbackRes.ok) {
+              const fbBody = await fallbackRes.text().catch(() => '');
+              return { ok: false, step: 'API Test', error: `Both gemini-2.0-flash (${testRes.status}) and gemini-1.5-flash (${fallbackRes.status}) failed.\n\nGoogle says: ${body.substring(0, 200)}`, useModel: null };
+            }
+            
+            console.log('[SlideCaster] Fallback gemini-1.5-flash works!');
+            return { ok: true, useModel: 'gemini-1.5-flash' };
+          }
+          
+          console.log('[SlideCaster] gemini-2.0-flash works!');
+          return { ok: true, useModel: 'gemini-2.0-flash' };
+        } catch (e) {
+          return { ok: false, step: 'API Test', error: e.message };
         }
       };
 
-      const generateTTS = async (text, voiceName) => {
-        // Official Gemini docs: TTS requires gemini-2.5-flash-preview-tts on v1beta
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?`;
-        const payload = {
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName }
-              }
-            }
-          }
-        };
-
-        const data = await safeGeminiFetch(url, payload);
-        const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-        if (!part) throw new Error("No audio data returned. Check if the text is valid.");
-
-        const mimeType = part.mimeType || "audio/L16; rate=24000";
-        const rateMatch = mimeType.match(/rate=(\d+)/);
-        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-
-        return base64ToWav(part.data, rate);
-      };
+      // Store which model works for this session
+      const [workingModel, setWorkingModel] = useState('gemini-2.0-flash');
 
       const startWithAI = async () => {
         if (!userApiKey.trim()) {
           alert("Please enter a valid Gemini API Key.");
           return;
         }
-        // Validate key before proceeding
-        const result = await validateApiKey(userApiKey.trim());
-        if (!result.valid) {
-          alert(`API Key validation failed (${result.status}): ${result.message?.substring(0, 200)}\n\nPlease check your key and try again.`);
+        
+        const result = await validateAndTestKey(userApiKey.trim());
+        if (!result.ok) {
+          alert(`❌ API Test Failed at "${result.step}":\n\n${result.error}\n\nThis means the issue is with your API key or Google project, not the app. Please verify your key in Google AI Studio.`);
           return;
         }
-        console.log('[SlideCaster] Key validated successfully!');
+        
+        console.log(`[SlideCaster] Using model: ${result.useModel}`);
+        setWorkingModel(result.useModel);
+        // Reset all quota state for fresh start (Cause #6)
+        setQuota({ used: 0, limit: 1500, rpm: 0 });
+        setRefillTime(null);
         setAiStatus('ready');
         setView('app');
       };
@@ -391,6 +433,32 @@
         }
       };
 
+      const generateTTS = async (text, voiceName) => {
+        // Official Gemini docs: TTS requires gemini-2.5-flash-preview-tts on v1beta
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?`;
+        const payload = {
+          contents: [{ parts: [{ text }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName }
+              }
+            }
+          }
+        };
+
+        const data = await safeGeminiFetch(url, payload);
+        const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+        if (!part) throw new Error("No audio data returned. Check if the text is valid.");
+
+        const mimeType = part.mimeType || "audio/L16; rate=24000";
+        const rateMatch = mimeType.match(/rate=(\d+)/);
+        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+        return base64ToWav(part.data, rate);
+      };
+
       const autoGenerateScript = async (id) => {
         const slide = slides.find(s => s.id === id);
         if (!slide || !slide.imageFile) {
@@ -409,8 +477,9 @@
           const base64Image = await fileToBase64(slide.imageFile);
           setQuota(q => ({ ...q, used: q.used + 1, rpm: q.rpm + 1 }));
           
-          // Use v1beta for multimodal (image) requests — v1 may reject free-tier image calls
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?`;
+          // Use whichever model passed the startup diagnostic test
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${workingModel}:generateContent?`;
+          console.log(`[SlideCaster] Script generation using model: ${workingModel}`);
           const payload = {
             contents: [{
               parts: [
@@ -454,12 +523,21 @@
         }
       };
 
-      const changeApiKey = () => {
+      const changeApiKey = async () => {
         const newKey = prompt("Enter your new Gemini API Key:", userApiKey);
         if (newKey !== null && newKey.trim() !== "") {
+          const result = await validateAndTestKey(newKey.trim());
+          if (!result.ok) {
+            alert(`❌ New key failed at "${result.step}":\n\n${result.error}`);
+            return;
+          }
           setUserApiKey(newKey.trim());
+          setWorkingModel(result.useModel);
+          // Reset all stale state (Cause #6)
+          setQuota({ used: 0, limit: 1500, rpm: 0 });
+          setRefillTime(null);
           setAiStatus('ready');
-          alert("API Key updated successfully.");
+          alert(`✅ API Key updated! Using model: ${result.useModel}`);
         }
       };
 
