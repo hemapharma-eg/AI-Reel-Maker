@@ -104,13 +104,100 @@
 
     // --- Config & Utils ---
     const VOICES = [
-      { id: "alloy", name: "Alloy (OpenAI)", provider: "openai" },
-      { id: "echo", name: "Echo (OpenAI)", provider: "openai" },
-      { id: "fable", name: "Fable (OpenAI)", provider: "openai" },
-      { id: "onyx", name: "Onyx (OpenAI)", provider: "openai" },
-      { id: "nova", name: "Nova (OpenAI)", provider: "openai" },
-      { id: "shimmer", name: "Shimmer (OpenAI)", provider: "openai" }
+      "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", 
+      "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", 
+      "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", 
+      "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", 
+      "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"
     ];
+
+    // Utility: Convert raw PCM Base64 to WAV Blob
+    function base64ToWav(base64, sampleRate = 24000) {
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const buffer = bytes.buffer; 
+
+      const wavBuffer = new ArrayBuffer(44 + buffer.byteLength);
+      const view = new DataView(wavBuffer);
+
+      const writeString = (v, offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          v.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+
+      const numChannels = 1;
+      const byteRate = sampleRate * numChannels * 2;
+      const blockAlign = numChannels * 2;
+
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + buffer.byteLength, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true); // Subchunk1Size
+      view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+      view.setUint16(22, numChannels, true); // NumChannels
+      view.setUint32(24, sampleRate, true); // SampleRate
+      view.setUint32(28, byteRate, true); // ByteRate
+      view.setUint16(32, blockAlign, true); // BlockAlign
+      view.setUint16(34, 16, true); // BitsPerSample
+      writeString(view, 36, 'data');
+      view.setUint32(40, buffer.byteLength, true); // Subchunk2Size
+
+      new Uint8Array(wavBuffer, 44).set(new Uint8Array(buffer));
+
+      return new Blob([wavBuffer], { type: 'audio/wav' });
+    }
+
+    // API Call for TTS using Gemini
+    async function generateTTS(text, voiceName, retries = 3) {
+      // Note: We use the local apiKey variable or a fallback
+      const currentApiKey = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : ""; 
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${currentApiKey}`;
+      
+      const payload = {
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName }
+            }
+          }
+        }
+      };
+
+      let delay = 1000;
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!res.ok) throw new Error(`API Error: ${res.status}`);
+          const data = await res.json();
+          
+          const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+          if (!part) throw new Error("No audio data returned. Check your API key and permissions.");
+
+          const mimeType = part.mimeType || "audio/L16; rate=24000";
+          const rateMatch = mimeType.match(/rate=(\d+)/);
+          const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+          return base64ToWav(part.data, rate);
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
+        }
+      }
+    }
 
     // Utility: Convert File to Base64 for Gemini API (not needed currently,แต่เก็บไว้เผื่อขยาย)
     const fileToBase64 = (file) => new Promise((resolve, reject) => {
@@ -142,7 +229,8 @@
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
-          audioName: ""
+          audioName: "",
+          isGenerating: false
         }
       ]);
       
@@ -155,7 +243,7 @@
       const [showVoiceModal, setShowVoiceModal] = useState(false);
       const [importText, setImportText] = useState("");
       
-      const [selectedVoice, setSelectedVoice] = useState("");
+      const [selectedVoice, setSelectedVoice] = useState("Kore");
       const [browserVoices, setBrowserVoices] = useState([]);
 
       const fileInputRef = useRef(null);
@@ -214,6 +302,24 @@
 
       const updateSlide = (id, updates) => {
         setSlides(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      };
+
+      const generateAudioForSlide = async (id) => {
+        const slide = slides.find(s => s.id === id);
+        if (!slide || !(slide.script || "").trim()) return;
+
+        updateSlide(id, { isGenerating: true });
+        try {
+          // Use the global selectedVoice for generation
+          const voiceToUse = selectedVoice || "Kore";
+          const audioBlob = await generateTTS(slide.script, voiceToUse);
+          const audioUrl = URL.createObjectURL(audioBlob);
+          updateSlide(id, { audioBlob, audioUrl, isGenerating: false, audioName: "Gemini AI Audio" });
+        } catch (error) {
+          console.error("Audio generation failed:", error);
+          updateSlide(id, { isGenerating: false });
+          alert("Failed to generate audio. Please check your script and API key.");
+        }
       };
 
     const handlePdfUpload = async (e) => {
@@ -860,6 +966,18 @@ Please return the result ONLY as a JSON array of strings, like this:
                       
                       <div className="flex items-center gap-2">
                         <button 
+                          onClick={() => generateAudioForSlide(slide.id)}
+                          disabled={!(slide.script || "").trim() || slide.isGenerating}
+                          className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] font-black px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-slate-200"
+                        >
+                          {slide.isGenerating ? (
+                             <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
+                          ) : (
+                             <><Mic className="w-3.5 h-3.5" /> {slide.audioUrl ? "Regenerate Voice" : "Generate Voice"}</>
+                          )}
+                        </button>
+                        
+                        <button 
                           onClick={() => speakText(slide.script, selectedVoice)}
                           className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2"
                         >
@@ -954,52 +1072,26 @@ Please return the result ONLY as a JSON array of strings, like this:
                   <div className="grid grid-cols-1 gap-4">
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <h3 className="text-[10px] uppercase font-black text-indigo-600 tracking-widest">Realistic Studio AI (OpenAI)</h3>
-                        <span className="bg-indigo-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">RECOMMENDED</span>
+                        <h3 className="text-[10px] uppercase font-black text-indigo-600 tracking-widest">Gemini High-Fidelity Voices</h3>
+                        <span className="bg-indigo-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">NEW STUDIO QUALITY</span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {VOICES.map(voice => (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {VOICES.map(voiceName => (
                           <div 
-                            key={voice.id} 
-                            onClick={() => { setSelectedVoice(voice.id); setShowVoiceModal(false); }}
-                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${selectedVoice === voice.id ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}`}
+                            key={voiceName} 
+                            onClick={() => { setSelectedVoice(voiceName); setShowVoiceModal(false); }}
+                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${selectedVoice === voiceName ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}`}
                           >
                             <div className="flex justify-between items-center relative z-10">
-                              <span className="font-bold text-sm text-slate-800">{voice.name}</span>
+                              <span className="font-bold text-sm text-slate-800">{voiceName}</span>
                               <button 
-                                onClick={(e) => { e.stopPropagation(); playVoiceSample(voice.id); }}
+                                onClick={(e) => { e.stopPropagation(); speakText(voiceName, voiceName); /* Just sample preview if implemented */ }}
                                 className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all"
                               >
                                 <Play className="w-4 h-4" />
                               </button>
                             </div>
-                            {selectedVoice === voice.id && <div className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-tl-2xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-3">Standard Voices (Robotic)</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {browserVoices.map(voice => (
-                          <div 
-                            key={voice.voiceURI} 
-                            onClick={() => { setSelectedVoice(voice.voiceURI); setShowVoiceModal(false); }}
-                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group ${selectedVoice === voice.voiceURI ? 'border-emerald-600 bg-emerald-50/30' : 'border-slate-100 hover:border-emerald-200 hover:bg-slate-50'}`}
-                          >
-                            <div className="flex justify-between items-center">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-sm text-slate-800 truncate max-w-[140px]">{voice.name}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{voice.lang} (System)</span>
-                              </div>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); playVoiceSample(voice.voiceURI); }}
-                                className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all"
-                              >
-                                <Play className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {selectedVoice === voiceName && <div className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-tl-2xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
                           </div>
                         ))}
                       </div>
@@ -1012,7 +1104,7 @@ Please return the result ONLY as a JSON array of strings, like this:
                     <Sparkles className="w-4 h-4 text-indigo-600" />
                   </div>
                   <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                    <b>Realistic Audio Tip:</b> Studio AI voices sound identical to human narrators. Standard voices use your computer's built-in engine and may sound robotic.
+                    <b>Professional Library:</b> These voices are generated using Gemini 2.5 Flash and offer human-like intonation and clarity.
                   </p>
                 </div>
               </div>
