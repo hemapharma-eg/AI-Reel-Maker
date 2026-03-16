@@ -73,6 +73,7 @@
     const ArrowUp = getSafeIcon('ArrowUp');
     const ArrowDown = getSafeIcon('ArrowDown');
     const FileOutput = getSafeIcon('FileOutput');
+    const Check = getSafeIcon('Check');
 
     const apiKey = ""; // Will be provided by environment
 
@@ -135,7 +136,6 @@
       const fileInputRef = useRef(null);
       const wordInputRef = useRef(null);
       const pdfInputRef = useRef(null);
-      const audioBulkInputRef = useRef(null);
 
       useEffect(() => {
         // Initialize PDF.js worker
@@ -292,23 +292,25 @@
       };
 
       const downloadWordTemplate = () => {
-        // Create a basic CSV-like blob that Word can open as a table or just a simple instruction doc
-        // Actually, creating a real .docx is better for the user experience
-        // We can use a simpler approach: encode a real but empty .docx template as base64
-        // Base64 for an empty .docx with a 2x2 table: Slide # | Transcript
-        const base64Template = "UEsDBBQAAAAIAKVqPlYK47fAAAAAAAEAABAAAFtBcnVwXS9fcmVscy8ucmVsc4SPvW7DMBCE7wX9DsH3VpIDRVCkuIAnSJBeoI86WqIkFqIukvbr27ZBy9IunHAH3N29U76+NreYOfmArW9VAnH0Dlr706ov8Lj8XN0AiaXdtTYHVs6Y2L3f757QSTlV0m6pEuFpVcE65M80mU4W3eE8yBfPmqMNoU6Yewis93mGlfS5K+A/Y6SSe66M/8w40pLPrIEH0DPrC087pYp5I+eREOaL/U9Kx2W658B/K6u/UEsDBBQAAAAIAKVqPlZjX/oAAAAAAAYAAAsAAHdvcmQvLndvcmRzP00DBBQAAAAIAKVqPlYAAAsAAAAAAA="; // Truncated for example
+        // More robust approach for Word compatibility: use specific headers and a BOM
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+          <head><meta charset='utf-8'><title>SlideCaster Transcript Template</title></head><body>
+          <h2>SlideCaster Transcript Template</h2>
+          <p>Fill in the table below and upload it back to SlideCaster. Do not change the column order.</p>
+          <table border='1' style='border-collapse:collapse; width:100%'>
+            <tr style='background-color:#f1f5f9'><th>Slide #</th><th>Transcript (Speak this)</th></tr>`;
         
-        // Let's generate a simple CSV and name it .csv or use an actual .docx generation if mammoth/docx is available
-        // Mammoth is only for reading. Let's use a Data URI for a simple Word-compatible HTML file
-        const html = `
-          <table border="1">
-            <tr><th>Slide #</th><th>Transcript</th></tr>
-            <tr><td>1</td><td>Enter transcript for slide 1 here...</td></tr>
-            <tr><td>2</td><td>Enter transcript for slide 2 here...</td></tr>
-            <tr><td>3</td><td>...</td></tr>
-          </table>
-        `;
-        const blob = new Blob([html], { type: 'application/msword' });
+        let rows = "";
+        const rowCount = slides.length > 0 ? slides.length : 10;
+        for (let i = 1; i <= rowCount; i++) {
+          rows += `<tr><td style='width:80px; text-align:center'>${i}</td><td></td></tr>`;
+        }
+        
+        const footer = "</table></body></html>";
+        const content = header + rows + footer;
+        
+        // Add Byte Order Mark (BOM) for UTF-8 compatibility with Word
+        const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -679,43 +681,14 @@ Please return the result ONLY as a JSON array of strings, like this:
               
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 <button 
-                  onClick={downloadWordTemplate}
-                  className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
-                >
-                  <Download className="w-3.5 h-3.5 text-blue-500" />
-                  Download Word Template
-                </button>
-                <button 
                   onClick={() => setShowVoiceModal(true)}
                   className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                   Professional Voice Gallery
                 </button>
-                <button 
-                  onClick={() => audioBulkInputRef.current?.click()}
-                  className="bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-md"
-                >
-                  <FileAudio className="w-3.5 h-3.5" />
-                  Bulk Audio Upload
-                </button>
-                <button 
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-md"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Upload PDF
-                </button>
-                <button 
-                  onClick={() => wordInputRef.current?.click()}
-                  className="bg-blue-600 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2 shadow-md"
-                >
-                  <FileOutput className="w-3.5 h-3.5" />
-                  Import Word Scripts
-                </button>
                 <input type="file" accept=".pdf" className="hidden" ref={pdfInputRef} onChange={handlePdfUpload} />
                 <input type="file" accept=".docx" className="hidden" ref={wordInputRef} onChange={handleWordUpload} />
-                <input type="file" multiple accept="audio/*" className="hidden" ref={audioBulkInputRef} onChange={handleBulkAudioUpload} />
               </div>
             </div>
           </header>
@@ -738,15 +711,24 @@ Please return the result ONLY as a JSON array of strings, like this:
                     className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center gap-2 active:scale-95"
                   >
                     <FileText className="w-4 h-4" />
-                    Upload PDF Slides
+                    Step 1: Upload PDF Slides
                   </button>
-                  <button 
-                    onClick={downloadWordTemplate}
-                    className="bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-sm font-bold px-5 py-2.5 rounded-xl transition-all flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download Script Template
-                  </button>
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={downloadWordTemplate}
+                      className="bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 text-sm font-bold px-5 py-2.5 rounded-l-xl transition-all flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Step 2: Download Template
+                    </button>
+                    <button 
+                      onClick={() => wordInputRef.current?.click()}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-2.5 rounded-r-xl transition-all flex items-center gap-2"
+                    >
+                      <FileOutput className="w-4 h-4" />
+                      Step 3: Import Scripts
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -930,7 +912,7 @@ Please return the result ONLY as a JSON array of strings, like this:
                 <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
                   <div>
                     <h2 className="text-xl font-black text-slate-900">Professional Voice Library</h2>
-                    <p className="text-xs text-slate-500 font-medium">Select a studio-quality or standard voice for your slides</p>
+                    <p className="text-xs text-slate-500 font-medium">Select a studio-quality realistic voice for your slides</p>
                   </div>
                   <button onClick={() => setShowVoiceModal(false)} className="text-slate-400 hover:text-slate-600 p-2 bg-slate-50 rounded-full transition-colors"><X className="w-5 h-5" /></button>
                 </div>
@@ -938,15 +920,18 @@ Please return the result ONLY as a JSON array of strings, like this:
                 <div className="p-8 overflow-y-auto flex-1">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="mb-4">
-                      <h3 className="text-[10px] uppercase font-black text-indigo-500 tracking-widest mb-3">AI Premium Voices (OpenAI)</h3>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h3 className="text-[10px] uppercase font-black text-indigo-600 tracking-widest">Realistic Studio AI (OpenAI)</h3>
+                        <span className="bg-indigo-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">RECOMMENDED</span>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {VOICES.map(voice => (
                           <div 
                             key={voice.id} 
                             onClick={() => { setSelectedVoice(voice.id); setShowVoiceModal(false); }}
-                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group ${selectedVoice === voice.id ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}`}
+                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${selectedVoice === voice.id ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}`}
                           >
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center relative z-10">
                               <span className="font-bold text-sm text-slate-800">{voice.name}</span>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); playVoiceSample(voice.id); }}
@@ -955,13 +940,14 @@ Please return the result ONLY as a JSON array of strings, like this:
                                 <Play className="w-4 h-4" />
                               </button>
                             </div>
+                            {selectedVoice === voice.id && <div className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-tl-2xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-[10px] uppercase font-black text-emerald-500 tracking-widest mb-3">Standard System Voices</h3>
+                      <h3 className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-3">Standard Voices (Robotic)</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {browserVoices.map(voice => (
                           <div 
@@ -972,7 +958,7 @@ Please return the result ONLY as a JSON array of strings, like this:
                             <div className="flex justify-between items-center">
                               <div className="flex flex-col">
                                 <span className="font-bold text-sm text-slate-800 truncate max-w-[140px]">{voice.name}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{voice.lang}</span>
+                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{voice.lang} (System)</span>
                               </div>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); playVoiceSample(voice.voiceURI); }}
@@ -988,9 +974,12 @@ Please return the result ONLY as a JSON array of strings, like this:
                   </div>
                 </div>
 
-                <div className="p-8 bg-slate-50 border-t border-slate-100">
-                  <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                    <b>Note:</b> Standard voices vary by browser. For best quality and recordable audio, use AI Premium voices with an OpenAI API key.
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
+                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                    <b>Realistic Audio Tip:</b> Studio AI voices sound identical to human narrators. Standard voices use your computer's built-in engine and may sound robotic.
                   </p>
                 </div>
               </div>
