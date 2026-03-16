@@ -785,8 +785,9 @@ Please return the result ONLY as a JSON array of strings, like this:
                       <button 
                         onClick={() => handleRemoveSlide(slide.id)}
                         className="text-slate-300 hover:text-red-500 transition-colors p-1"
+                        title="Delete Slide"
                       >
-                    <Trash2 className="w-4 h-4" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                     
@@ -828,10 +829,6 @@ Please return the result ONLY as a JSON array of strings, like this:
                         >
                           <Play className="w-3.5 h-3.5" /> Listen
                         </button>
-                        <label className="cursor-pointer bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-md active:scale-95">
-                          <Mic className="w-3.5 h-3.5" /> {slide.audioUrl ? "Replace Audio" : "Upload Audio"}
-                          <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleAudioUpload(slide.id, e)} />
-                        </label>
                       </div>
                     </div>
                   </div>
