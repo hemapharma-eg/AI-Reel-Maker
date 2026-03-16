@@ -226,6 +226,7 @@
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
       const [userApiKey, setUserApiKey] = useState('');
       const [globalVoice, setGlobalVoice] = useState("Kore");
+      const [activeAudio, setActiveAudio] = useState({ id: null, audio: null, isPlaying: false });
 
       const [slides, setSlides] = useState([
         { 
@@ -367,11 +368,6 @@
         setAiStatus('ready');
         setView('app');
       };
-      
-      const skipAI = () => {
-        setAiStatus('skipped');
-        setView('app');
-      };
 
       const autoGenerateScript = async (id) => {
         const slide = slides.find(s => s.id === id);
@@ -439,10 +435,37 @@
         }
       };
 
-      const playAudio = (url) => {
+      const playAudio = (id, url) => {
         if (!url) return;
+        
+        if (activeAudio.id === id && activeAudio.audio) {
+          if (activeAudio.isPlaying) {
+            activeAudio.audio.pause();
+            setActiveAudio(prev => ({ ...prev, isPlaying: false }));
+          } else {
+            activeAudio.audio.play();
+            setActiveAudio(prev => ({ ...prev, isPlaying: true }));
+          }
+          return;
+        }
+
+        if (activeAudio.audio) {
+          activeAudio.audio.pause();
+          activeAudio.audio.currentTime = 0;
+        }
+
         const audio = new Audio(url);
-        audio.play().catch(e => console.error("Audio playback failed:", e));
+        audio.onended = () => setActiveAudio({ id: null, audio: null, isPlaying: false });
+        audio.play();
+        setActiveAudio({ id, audio, isPlaying: true });
+      };
+
+      const stopAudio = () => {
+        if (activeAudio.audio) {
+          activeAudio.audio.pause();
+          activeAudio.audio.currentTime = 0;
+        }
+        setActiveAudio({ id: null, audio: null, isPlaying: false });
       };
 
       const compileVideo = async () => {
@@ -493,26 +516,23 @@
             recorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType }));
           });
 
-          // Manual data slice to ensure data flows on Windows/Older browsers
-          recorder.start(1000); 
+          // Manual data slice for robustness
+          recorder.start(500); 
           
-          // Audio context resume in case it's suspended
           if (audioCtx.state === 'suspended') await audioCtx.resume();
 
           let isRecording = true;
           let currentSlideVisual = null;
+          let currentSentenceIndex = -1;
 
           const renderLoop = () => {
             if (!isRecording) return;
-            ctx.fillStyle = '#0f172a'; 
+            ctx.fillStyle = '#1e293b'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             if (currentSlideVisual) {
               const imageAreaW = 920;
               const sidebarW = 360;
-              
-              ctx.fillStyle = '#1e293b';
-              ctx.fillRect(0, 0, imageAreaW, canvas.height);
 
               if (currentSlideVisual.img) {
                 const img = currentSlideVisual.img;
@@ -520,15 +540,10 @@
                 const w = img.width * scale;
                 const h = img.height * scale;
                 ctx.drawImage(img, (imageAreaW - w) / 2, (canvas.height - h) / 2, w, h);
-              } else {
-                ctx.fillStyle = '#f8fafc';
-                ctx.font = 'bold 40px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(currentSlideVisual.text, imageAreaW / 2, canvas.height / 2);
               }
 
               ctx.strokeStyle = '#334155';
-              ctx.lineWidth = 2;
+              ctx.lineWidth = 1;
               ctx.beginPath();
               ctx.moveTo(imageAreaW, 0); ctx.lineTo(imageAreaW, canvas.height);
               ctx.stroke();
@@ -537,34 +552,38 @@
                 const elapsed = performance.now() - currentSlideVisual.startTime;
                 const progress = Math.min(1, Math.max(0, elapsed / currentSlideVisual.duration));
                 const totalSentences = currentSlideVisual.sentences.length;
-                const visibleCount = Math.min(totalSentences, Math.floor(progress * totalSentences) + 1);
+                const activeIndex = Math.min(totalSentences - 1, Math.floor(progress * totalSentences));
 
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-                let currentY = 40;
-                const startX = imageAreaW + 30;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 28px sans-serif';
+
+                const sentence = currentSlideVisual.sentences[activeIndex];
+                const startX = imageAreaW + sidebarW / 2;
+                const startY = canvas.height / 2;
                 const maxTextW = sidebarW - 60;
 
-                for (let j = 0; j < totalSentences; j++) {
-                  if (j < visibleCount) {
-                    const isCurrent = j === visibleCount - 1;
-                    ctx.fillStyle = isCurrent ? '#ffffff' : '#94a3b8';
-                    ctx.font = (isCurrent ? 'bold ' : '') + '22px sans-serif';
-                    
-                    const words = currentSlideVisual.sentences[j].split(' ');
-                    let line = '';
-                    for(let n = 0; n < words.length; n++) {
-                      const testLine = line + words[n] + ' ';
-                      if (ctx.measureText(testLine).width > maxTextW && n > 0) {
-                        ctx.fillText(line, startX, currentY);
-                        line = words[n] + ' ';
-                        currentY += 30;
-                      } else { line = testLine; }
-                    }
-                    ctx.fillText(line, startX, currentY);
-                    currentY += 40; 
+                const words = sentence.split(' ');
+                let lines = [];
+                let currentLine = '';
+
+                for (let n = 0; n < words.length; n++) {
+                  const testLine = currentLine + words[n] + ' ';
+                  if (ctx.measureText(testLine).width > maxTextW && n > 0) {
+                    lines.push(currentLine);
+                    currentLine = words[n] + ' ';
+                  } else {
+                    currentLine = testLine;
                   }
                 }
+                lines.push(currentLine);
+
+                const lineHt = 35;
+                const totalHt = lines.length * lineHt;
+                lines.forEach((line, idx) => {
+                  ctx.fillText(line.trim(), startX, startY - (totalHt / 2) + (idx * lineHt) + (lineHt / 2));
+                });
               }
             }
             requestAnimationFrame(renderLoop);
@@ -574,7 +593,7 @@
 
           for (let i = 0; i < slides.length; i++) {
             const slide = slides[i];
-            setCompilationProgress(`Processing slide ${i + 1} of ${slides.length}...`);
+            setCompilationProgress(`Slide ${i + 1} / ${slides.length}...`);
             
             const sentenceRegex = /[^.!?]+[.!?]+|\s*$/g;
             const sentences = (slide.script ? slide.script.match(sentenceRegex) : []) || [];
@@ -596,11 +615,11 @@
                 audioDurationMs = audioBuffer.duration * 1000;
               } catch (e) {}
             } else if (slide.script) {
-              audioDurationMs = Math.max(3000, slide.script.length * 60);
+              audioDurationMs = Math.max(3000, slide.script.length * 70);
             }
 
             currentSlideVisual = { 
-              img: slideImg, text: `Slide ${i + 1}`, sentences, 
+              img: slideImg, sentences, 
               duration: audioDurationMs, startTime: performance.now()
             };
 
@@ -613,9 +632,13 @@
             } else {
                 await new Promise(r => setTimeout(r, audioDurationMs));
             }
+            
+            // tiny buffer between slides
+            await new Promise(r => setTimeout(r, 200));
           }
 
-          setCompilationProgress("Finalizing video file...");
+          setCompilationProgress("Saving video...");
+          await new Promise(r => setTimeout(r, 500)); 
           isRecording = false; 
           recorder.stop();
           const finalBlob = await recordPromise;
@@ -655,8 +678,7 @@
                 />
               </div>
               <div className="flex flex-col gap-3">
-                <button onClick={startWithAI} disabled={!userApiKey.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-xl transition-all">Save Key & Start</button>
-                <button onClick={skipAI} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-xl transition-all">Skip AI (Manual)</button>
+                <button onClick={startWithAI} disabled={!userApiKey.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-xl transition-all shadow-md">Save Key & Start</button>
               </div>
             </div>
           </div>
@@ -750,7 +772,18 @@
                         {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                       <div className="flex items-center gap-2">
-                        {slide.audioUrl && <button onClick={() => playAudio(slide.audioUrl)} className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200"><PlayIcon className="w-4 h-4 ml-0.5"/></button>}
+                        {slide.audioUrl && (
+                          <div className="flex items-center bg-slate-100 rounded-full px-1 py-1 gap-1">
+                            <button onClick={() => playAudio(slide.id, slide.audioUrl)} className={`w-8 h-8 flex items-center justify-center rounded-full ${activeAudio.id === slide.id && activeAudio.isPlaying ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 border border-slate-200'} hover:scale-105 transition-all`}>
+                              {activeAudio.id === slide.id && activeAudio.isPlaying ? <XIcon className="w-4 h-4"/> : <PlayIcon className="w-3.5 h-3.5 ml-0.5"/>}
+                            </button>
+                            {(activeAudio.id === slide.id) && (
+                              <button onClick={stopAudio} className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-rose-500 border border-slate-200 hover:scale-105 transition-all">
+                                <div className="w-2.5 h-2.5 bg-rose-500 rounded-sm"></div>
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <button onClick={() => generateAudioForSlide(slide.id)} disabled={!(slide.script || "").trim() || slide.isGenerating} className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-2">
                           {slide.isGenerating ? <><LoaderIcon className="w-4 h-4 animate-spin"/> Generating...</> : <><MicIcon className="w-4 h-4"/> Generate Voice</>}
                         </button>
@@ -767,9 +800,16 @@
 
           <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-lg z-20">
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-              <div className="text-sm text-slate-500 font-medium">Total Slides: <span className="text-slate-900">{slides.length}</span></div>
-              <button onClick={compileVideo} disabled={isCompiling || slides.length === 0} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white font-semibold px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
-                {isCompiling ? <><LoaderIcon className="w-5 h-5 animate-spin"/> {compilationProgress}</> : <><VideoIcon className="w-5 h-5"/> Compile Video</>}
+              <div className="flex flex-col">
+                <div className="text-sm text-slate-500 font-medium">Total Slides: <span className="text-slate-900">{slides.length}</span></div>
+                {!slides.every(s => s.audioUrl) && <div className="text-[10px] text-rose-500 font-semibold animate-pulse uppercase tracking-wider">Generate all voices to compile</div>}
+              </div>
+              <button 
+                onClick={compileVideo} 
+                disabled={isCompiling || slides.length === 0 || !slides.every(s => s.audioUrl)} 
+                className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 text-white font-semibold px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2 group"
+              >
+                {isCompiling ? <><LoaderIcon className="w-5 h-5 animate-spin"/> {compilationProgress}</> : <><VideoIcon className="w-5 h-5 group-hover:scale-110 transition-transform"/> Compile Video</>}
               </button>
             </div>
           </footer>
