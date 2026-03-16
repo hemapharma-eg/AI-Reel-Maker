@@ -3,80 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SlideCaster - AI Voice-Over-Slides</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <title>SlideCaster - Gemini Pro Video Generator</title>
+  
+  <!-- CDNs for React, Tailwind, and Libraries -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://unpkg.com/lucide-react@latest"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <!-- Core Dependencies -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
     body { font-family: 'Inter', sans-serif; }
-    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes zoom-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    .animate-in { animation: var(--anim-name) var(--anim-duration) ease-out; }
-    .fade-in { --anim-name: fade-in; --anim-duration: 300ms; }
-    .zoom-in { --anim-name: zoom-in; --anim-duration: 300ms; }
+    .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
+
+    // --- Safety check for Lucide icons ---
     const getSafeIcon = (name) => {
-      // Hardcoded bulletproof fallbacks for problematic icons
       const fallbacks = {
         ArrowUp: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="m18 15-6-6-6 6"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
         ),
         ArrowDown: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="m6 9 6 6 6-6"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
         ),
         X: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         ),
         Check: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="20 6 9 17 4 12"/></svg>
         )
       };
 
       if (fallbacks[name]) return fallbacks[name];
-
-      // Try multiple possible global names used by various CDN versions
       const Lib = (typeof LucideReact !== 'undefined' ? LucideReact : (typeof lucide !== 'undefined' ? lucide : null));
-      
-      // Try different lookup paths in the object
       if (Lib) {
         if (Lib[name]) return Lib[name];
-        // Some versions put components inside an 'icons' sub-object
         if (Lib.icons && Lib.icons[name]) return Lib.icons[name];
-        // Handle case sensitivity variations
         const lowerName = name.toLowerCase();
-        for (let key in Lib) {
-          if (key.toLowerCase() === lowerName) return Lib[key];
-        }
+        for (let key in Lib) { if (key.toLowerCase() === lowerName) return Lib[key]; }
       }
-
-      // Final bulletproof fallback: Simple Alert icon
       return (props) => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
       );
     };
 
@@ -91,18 +71,11 @@
     const Upload = getSafeIcon('Upload');
     const Settings = getSafeIcon('Settings');
     const Sparkles = getSafeIcon('Sparkles');
-    const FileText = getSafeIcon('FileText');
-    const Clipboard = getSafeIcon('Clipboard');
-    const FileAudio = getSafeIcon('FileAudio');
-    const X = getSafeIcon('X');
-    const ArrowUp = getSafeIcon('ArrowUp');
-    const ArrowDown = getSafeIcon('ArrowDown');
-    const FileOutput = getSafeIcon('FileOutput');
+    const ChevronUp = getSafeIcon('ArrowUp');
+    const ChevronDown = getSafeIcon('ArrowDown');
+    const XIcon = getSafeIcon('X');
     const Check = getSafeIcon('Check');
 
-    const apiKey = ""; // Will be provided by environment
-
-    // --- Config & Utils ---
     const VOICES = [
       "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", 
       "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", 
@@ -138,27 +111,23 @@
       view.setUint32(4, 36 + buffer.byteLength, true);
       writeString(view, 8, 'WAVE');
       writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true); // Subchunk1Size
-      view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
-      view.setUint16(22, numChannels, true); // NumChannels
-      view.setUint32(24, sampleRate, true); // SampleRate
-      view.setUint32(28, byteRate, true); // ByteRate
-      view.setUint16(32, blockAlign, true); // BlockAlign
-      view.setUint16(34, 16, true); // BitsPerSample
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);
       writeString(view, 36, 'data');
-      view.setUint32(40, buffer.byteLength, true); // Subchunk2Size
+      view.setUint32(40, buffer.byteLength, true);
 
       new Uint8Array(wavBuffer, 44).set(new Uint8Array(buffer));
-
       return new Blob([wavBuffer], { type: 'audio/wav' });
     }
 
     // API Call for TTS using Gemini
-    async function generateTTS(text, voiceName, retries = 3) {
-      // Note: We use the local apiKey variable or a fallback
-      const currentApiKey = (typeof apiKey !== 'undefined' && apiKey) ? apiKey : ""; 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${currentApiKey}`;
-      
+    async function generateTTS(text, voiceName, userApiKey, retries = 3) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${userApiKey}`;
       const payload = {
         contents: [{ parts: [{ text }] }],
         generationConfig: {
@@ -184,7 +153,7 @@
           const data = await res.json();
           
           const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-          if (!part) throw new Error("No audio data returned. Check your API key and permissions.");
+          if (!part) throw new Error("No audio data returned");
 
           const mimeType = part.mimeType || "audio/L16; rate=24000";
           const rateMatch = mimeType.match(/rate=(\d+)/);
@@ -199,7 +168,6 @@
       }
     }
 
-    // Utility: Convert File to Base64 for Gemini API (not needed currently,แต่เก็บไว้เผื่อขยาย)
     const fileToBase64 = (file) => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -207,20 +175,12 @@
       reader.onerror = error => reject(error);
     });
 
-    // Utility: Extract slide notes from PPTX XML
-    const extractNotesFromXml = (xmlStr) => {
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlStr, "text/xml");
-      const textNodes = xmlDoc.getElementsByTagName("a:t");
-      let notes = "";
-      for (let node of textNodes) {
-        notes += node.textContent + " ";
-      }
-      return notes.trim();
-    };
-
-    // Main Application Component
     function SlideCasterApp() {
+      const [view, setView] = useState('home'); // 'home' or 'app'
+      const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
+      const [userApiKey, setUserApiKey] = useState('');
+      const [globalVoice, setGlobalVoice] = useState("Kore");
+
       const [slides, setSlides] = useState([
         { 
           id: 1, 
@@ -229,8 +189,10 @@
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
-          audioName: "",
-          isGenerating: false
+          isGenerating: false, 
+          voice: "Kore",
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
         }
       ]);
       
@@ -238,40 +200,7 @@
       const [compilationProgress, setCompilationProgress] = useState("");
       const [finalVideoUrl, setFinalVideoUrl] = useState(null);
 
-      const [showPromptModal, setShowPromptModal] = useState(false);
-      const [showImportModal, setShowImportModal] = useState(false);
-      const [showVoiceModal, setShowVoiceModal] = useState(false);
-      const [importText, setImportText] = useState("");
-      
-      const [selectedVoice, setSelectedVoice] = useState("Kore");
-      const [browserVoices, setBrowserVoices] = useState([]);
-
       const fileInputRef = useRef(null);
-      const wordInputRef = useRef(null);
-      const pdfInputRef = useRef(null);
-
-      useEffect(() => {
-        // Initialize PDF.js worker
-        if (window.pdfjsLib) {
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
-
-        const loadBrowserVoices = () => {
-          const v = window.speechSynthesis.getVoices();
-          // Filter out low-quality/redundant ones if possible, or just show all
-          const filtered = v.filter(voice => !voice.name.includes('Compact'));
-          setBrowserVoices(filtered);
-          if (filtered.length > 0 && !selectedVoice) {
-             const defaultVoice = filtered.find(v => v.default) || filtered[0];
-             setSelectedVoice(defaultVoice.voiceURI);
-          }
-        };
-        
-        loadBrowserVoices();
-        if (window.speechSynthesis.onvoiceschanged !== undefined) {
-          window.speechSynthesis.onvoiceschanged = loadBrowserVoices;
-        }
-      }, []);
 
       const handleAddSlide = () => {
         setSlides(prev => [...prev, { 
@@ -280,8 +209,11 @@
           imagePreviewUrl: null, 
           script: "", 
           audioBlob: null, 
-          audioUrl: null,
-          audioName: ""
+          audioUrl: null, 
+          isGenerating: false,
+          voice: globalVoice,
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
         }]);
       };
 
@@ -289,177 +221,8 @@
         setSlides(prev => prev.filter(s => s.id !== id));
       };
 
-      const handleMoveSlide = (index, direction) => {
-        const newIndex = index + direction;
-        if (newIndex < 0 || newIndex >= slides.length) return;
-        
-        const newSlides = [...slides];
-        const temp = newSlides[index];
-        newSlides[index] = newSlides[newIndex];
-        newSlides[newIndex] = temp;
-        setSlides(newSlides);
-      };
-
       const updateSlide = (id, updates) => {
         setSlides(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-      };
-
-      const generateAudioForSlide = async (id) => {
-        const slide = slides.find(s => s.id === id);
-        if (!slide || !(slide.script || "").trim()) return;
-
-        updateSlide(id, { isGenerating: true });
-        try {
-          // Use the global selectedVoice for generation
-          const voiceToUse = selectedVoice || "Kore";
-          const audioBlob = await generateTTS(slide.script, voiceToUse);
-          const audioUrl = URL.createObjectURL(audioBlob);
-          updateSlide(id, { audioBlob, audioUrl, isGenerating: false, audioName: "Gemini AI Audio" });
-        } catch (error) {
-          console.error("Audio generation failed:", error);
-          updateSlide(id, { isGenerating: false });
-          alert("Failed to generate audio. Please check your script and API key.");
-        }
-      };
-
-    const handlePdfUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsCompiling(true);
-        setCompilationProgress("Processing PDF Slides...");
-
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          const numPages = pdf.numPages;
-          
-          const newSlides = [];
-          for (let i = 1; i <= numPages; i++) {
-            setCompilationProgress(`Rendering page ${i} of ${numPages}...`);
-            const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 }); // 2x for high resolution
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            
-            await page.render({ canvasContext: context, viewport: viewport }).promise;
-            const dataUrl = canvas.toDataURL('image/png');
-            
-            // Check if we already have a slide (to merge with PPTX notes)
-            // If we are uploading PDF, we usually want to REPLACE images of existing slides
-            // or create new ones if they don't exist.
-            
-            newSlides.push({
-              id: Date.now() + i + Math.random(),
-              imageFile: null,
-              imagePreviewUrl: dataUrl,
-              script: slides[i-1]?.script || "", // Try to preserve script if it exists
-              audioBlob: slides[i-1]?.audioBlob || null,
-              audioUrl: slides[i-1]?.audioUrl || null,
-              audioName: slides[i-1]?.audioName || ""
-            });
-          }
-
-          setSlides(newSlides);
-        } catch (err) {
-          console.error("PDF Error:", err);
-          alert("Failed to process PDF. Make sure it's a valid file.");
-        } finally {
-          setIsCompiling(false);
-          setCompilationProgress("");
-          if (pdfInputRef.current) pdfInputRef.current.value = "";
-        }
-      };
-
-    const handleWordUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsCompiling(true);
-        setCompilationProgress("Reading Word Document...");
-
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-          const html = result.value;
-          
-          // Simple table parser for the extracted HTML
-          const Parser = new DOMParser();
-          const doc = Parser.parseFromString(html, 'text/html');
-          const rows = Array.from(doc.querySelectorAll('tr'));
-          
-          const scriptMap = {};
-          rows.forEach((row, index) => {
-            const cells = Array.from(row.querySelectorAll('td'));
-            if (cells.length >= 2) {
-              const slideNum = parseInt(cells[0].textContent.replace(/[^0-9]/g, ''));
-              const transcript = cells[1].textContent.trim();
-              if (!isNaN(slideNum) && transcript) {
-                scriptMap[slideNum] = transcript;
-              }
-            }
-          });
-
-          setSlides(prev => prev.map((slide, index) => {
-            const slideNum = index + 1;
-            if (scriptMap[slideNum]) {
-              return { ...slide, script: scriptMap[slideNum] };
-            }
-            return slide;
-          }));
-
-          alert("Successfully imported scripts from Word!");
-        } catch (err) {
-          console.error("Word Error:", err);
-          alert("Failed to process Word file. Make sure it's a valid .docx with two columns: Slide # and Transcript.");
-        } finally {
-          setIsCompiling(false);
-          setCompilationProgress("");
-          if (wordInputRef.current) wordInputRef.current.value = "";
-        }
-      };
-
-      const downloadWordTemplate = () => {
-        // Robust approach for Word: use a specific XML envelope that Word recognizes immediately
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-          <head>
-            <!--[if gte mso 9]>
-            <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml>
-            <![endif]-->
-            <meta charset='utf-8'>
-            <style>
-              table { border-collapse: collapse; width: 100%; border: 1px solid #ddd; }
-              th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-family: sans-serif; }
-              th { background-color: #f1f5f9; font-weight: bold; }
-            </style>
-          </head>
-          <body>
-          <h2>SlideCaster Transcript Template</h2>
-          <p>Fill in the table below. Do not change the column order.</p>
-          <table>
-            <tr><th style='width:80px'>Slide #</th><th>Transcript (Speak this)</th></tr>`;
-        
-        let rows = "";
-        const rowCount = slides.length > 0 ? slides.length : 10;
-        for (let i = 1; i <= rowCount; i++) {
-          rows += `<tr><td style='text-align:center'>${i}</td><td></td></tr>`;
-        }
-        
-        const footer = "</table></body></html>";
-        const content = header + rows + footer;
-        
-        // Add Byte Order Mark (BOM) for UTF-8 compatibility and serve with correct MIME
-        const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = "SlideCaster_Template.doc";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
       };
 
       const handleImageUpload = (id, e) => {
@@ -482,7 +245,10 @@
           script: "",
           audioBlob: null,
           audioUrl: null,
-          audioName: ""
+          isGenerating: false,
+          voice: globalVoice,
+          isGeneratingScript: false,
+          scriptGenerationProgress: ""
         }));
 
         setSlides(prev => {
@@ -498,72 +264,83 @@
         }
       };
 
-      const handleAudioUpload = (id, e) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-          const file = files[0];
-          const audioUrl = URL.createObjectURL(file);
-          updateSlide(id, { audioBlob: file, audioUrl, audioName: file.name });
+      const startWithAI = () => {
+        if (!userApiKey.trim()) {
+          alert("Please enter a valid Gemini API Key.");
+          return;
+        }
+        setAiStatus('ready');
+        setView('app');
+      };
+      
+      const skipAI = () => {
+        setAiStatus('skipped');
+        setView('app');
+      };
+
+      const autoGenerateScript = async (id) => {
+        const slide = slides.find(s => s.id === id);
+        if (!slide || !slide.imageFile) {
+          alert("Please upload an image for this slide first.");
+          return;
+        }
+
+        if (aiStatus !== 'ready' || !userApiKey) {
+          alert("AI was skipped or no API key provided. Please reload the app to enter your key.");
+          return;
+        }
+
+        updateSlide(id, { isGeneratingScript: true, scriptGenerationProgress: 'Analyzing Slide...' });
+
+        try {
+          const base64Image = await fileToBase64(slide.imageFile);
+          
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: "Act as an expert educator. Look at this presentation slide and provide a comprehensive, clear, and easy-to-understand explanation for students. Your explanation should be detailed enough that students will not need extra support to understand the concept shown. Aim for a thorough narrative style (about 5-8 sentences) that covers all key details, context, and implications. Return only the script text." },
+                  { inlineData: { mimeType: slide.imageFile.type, data: base64Image } }
+                ]
+              }]
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`API Error: ${response.status} - Please check if your API key is correct.`);
+          }
+
+          const data = await response.json();
+          const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+          if (generatedText) {
+             updateSlide(id, { script: generatedText.trim(), isGeneratingScript: false, scriptGenerationProgress: '' });
+          } else {
+             throw new Error("No text generated by AI");
+          }
+        } catch (err) {
+          console.error("Gemini AI Generation failed:", err);
+          alert("Failed to auto-generate script. " + err.message);
+          updateSlide(id, { isGeneratingScript: false, scriptGenerationProgress: '' });
         }
       };
 
-      const handleBulkAudioUpload = (e) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length === 0) return;
+      const generateAudioForSlide = async (id) => {
+        const slide = slides.find(s => s.id === id);
+        if (!slide || !(slide.script || "").trim()) return;
 
-        // Try to match by filename number or just sequential
-        const sortedFiles = files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-        
-        setSlides(prev => prev.map((slide, index) => {
-          if (index < sortedFiles.length) {
-            const file = sortedFiles[index];
-            return {
-              ...slide,
-              audioBlob: file,
-              audioUrl: URL.createObjectURL(file),
-              audioName: file.name
-            };
-          }
-          return slide;
-        }));
-      };
-
-      const copyAiPrompt = () => {
-        const slideCount = slides.length;
-        const prompt = `I am creating a video with ${slideCount} slides. Please write a clear, engaging educational script for each slide (approx 3-5 sentences per slide). 
-Topic: [INSERT TOPIC HERE]
-
-Please return the result ONLY as a JSON array of strings, like this:
-["Script for slide 1...", "Script for slide 2...", ...]`;
-        
-        navigator.clipboard.writeText(prompt);
-        alert("AI Prompt copied to clipboard! Paste it into Gemini or ChatGPT, then come back and click 'Bulk Import Scripts'.");
-      };
-
-      const handleImportScripts = () => {
+        updateSlide(id, { isGenerating: true });
         try {
-          let data = [];
-          if (importText.trim().startsWith("[")) {
-            data = JSON.parse(importText);
-          } else {
-            // Fallback: split by newlines if not JSON
-            data = importText.split("\n").filter(l => l.trim().length > 10);
-          }
-
-          if (!Array.isArray(data)) throw new Error("Imported data must be an array of strings.");
-
-          setSlides(prev => prev.map((slide, index) => {
-            if (index < data.length) {
-              return { ...slide, script: data[index] };
-            }
-            return slide;
-          }));
-          
-          setShowImportModal(false);
-          setImportText("");
-          alert("Successfully imported scripts!");
-        } catch (e) {
-          alert("Failed to import. Please make sure you pasted a valid JSON array or a list of sentences.");
+          const apiKeyToUse = aiStatus === 'ready' ? userApiKey : "";
+          const audioBlob = await generateTTS(slide.script, slide.voice, apiKeyToUse);
+          const audioUrl = URL.createObjectURL(audioBlob);
+          updateSlide(id, { audioBlob, audioUrl, isGenerating: false });
+        } catch (error) {
+          console.error("Audio generation failed:", error);
+          updateSlide(id, { isGenerating: false });
+          alert("Failed to generate audio. Please check your script and API key.");
         }
       };
 
@@ -571,24 +348,6 @@ Please return the result ONLY as a JSON array of strings, like this:
         if (!url) return;
         const audio = new Audio(url);
         audio.play().catch(e => console.error("Audio playback failed:", e));
-      };
-
-      const speakText = (text, voiceId) => {
-        if (!text) return;
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Find selected voice (either browser voice or we use default)
-        const voice = browserVoices.find(v => v.voiceURI === voiceId || v.name === voiceId);
-        if (voice) utterance.voice = voice;
-        
-        window.speechSynthesis.speak(utterance);
-      };
-
-      const playVoiceSample = (voiceName) => {
-        const sampleText = "Hello! This is a sample of my voice. I hope it sounds great for your presentation.";
-        // Preview with browser voice for now, or just notify
-        speakText(sampleText, voiceName);
       };
 
       const compileVideo = async () => {
@@ -603,15 +362,9 @@ Please return the result ONLY as a JSON array of strings, like this:
           const ctx = canvas.getContext('2d');
 
           const getStream = canvas.captureStream || canvas.mozCaptureStream;
-          if (!getStream) {
-            throw new Error("Your browser does not support canvas video export. Try Chrome or Edge.");
-          }
+          if (!getStream) throw new Error("Canvas video export not supported.");
           
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-          if (!AudioContextClass) {
-            throw new Error("Your browser does not support AudioContext.");
-          }
-
           const audioCtx = new AudioContextClass();
           const dest = audioCtx.createMediaStreamDestination();
 
@@ -622,18 +375,11 @@ Please return the result ONLY as a JSON array of strings, like this:
           ]);
 
           let options = { mimeType: 'video/webm;codecs=vp9,opus' };
-          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/webm' };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-              options = { mimeType: 'video/mp4' };
-            }
-          }
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
 
           const recorder = new MediaRecorder(combinedStream, options);
           const chunks = [];
-          recorder.ondataavailable = e => {
-            if (e.data && e.data.size > 0) chunks.push(e.data);
-          };
+          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
           const recordPromise = new Promise(resolve => {
             recorder.onstop = () => resolve(new Blob(chunks, { type: options.mimeType }));
@@ -646,7 +392,6 @@ Please return the result ONLY as a JSON array of strings, like this:
 
           const renderLoop = () => {
             if (!isRecording) return;
-            
             ctx.fillStyle = '#0f172a'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -662,9 +407,7 @@ Please return the result ONLY as a JSON array of strings, like this:
                 const scale = Math.min(imageAreaW / img.width, canvas.height / img.height);
                 const w = img.width * scale;
                 const h = img.height * scale;
-                const x = (imageAreaW - w) / 2;
-                const y = (canvas.height - h) / 2;
-                ctx.drawImage(img, x, y, w, h);
+                ctx.drawImage(img, (imageAreaW - w) / 2, (canvas.height - h) / 2, w, h);
               } else {
                 ctx.fillStyle = '#f8fafc';
                 ctx.font = 'bold 40px sans-serif';
@@ -675,20 +418,17 @@ Please return the result ONLY as a JSON array of strings, like this:
               ctx.strokeStyle = '#334155';
               ctx.lineWidth = 2;
               ctx.beginPath();
-              ctx.moveTo(imageAreaW, 0);
-              ctx.lineTo(imageAreaW, canvas.height);
+              ctx.moveTo(imageAreaW, 0); ctx.lineTo(imageAreaW, canvas.height);
               ctx.stroke();
 
               if (currentSlideVisual.sentences && currentSlideVisual.duration > 0) {
                 const elapsed = performance.now() - currentSlideVisual.startTime;
                 const progress = Math.min(1, Math.max(0, elapsed / currentSlideVisual.duration));
-                
                 const totalSentences = currentSlideVisual.sentences.length;
                 const visibleCount = Math.min(totalSentences, Math.floor(progress * totalSentences) + 1);
 
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
-                
                 let currentY = 40;
                 const startX = imageAreaW + 30;
                 const maxTextW = sidebarW - 60;
@@ -701,17 +441,13 @@ Please return the result ONLY as a JSON array of strings, like this:
                     
                     const words = currentSlideVisual.sentences[j].split(' ');
                     let line = '';
-                    
                     for(let n = 0; n < words.length; n++) {
                       const testLine = line + words[n] + ' ';
-                      const metrics = ctx.measureText(testLine);
-                      if (metrics.width > maxTextW && n > 0) {
+                      if (ctx.measureText(testLine).width > maxTextW && n > 0) {
                         ctx.fillText(line, startX, currentY);
                         line = words[n] + ' ';
                         currentY += 30;
-                      } else {
-                        line = testLine;
-                      }
+                      } else { line = testLine; }
                     }
                     ctx.fillText(line, startX, currentY);
                     currentY += 40; 
@@ -729,44 +465,31 @@ Please return the result ONLY as a JSON array of strings, like this:
             setCompilationProgress(`Processing slide ${i + 1} of ${slides.length}...`);
             
             const sentenceRegex = /[^.!?]+[.!?]+|\s*$/g;
-            const rawSentences = slide.script ? slide.script.match(sentenceRegex) : [];
-            const sentences = rawSentences ? rawSentences.map(s => s.trim()).filter(Boolean) : [];
+            const sentences = (slide.script ? slide.script.match(sentenceRegex) : []) || [];
             if (sentences.length === 0 && slide.script) sentences.push(slide.script);
 
             let slideImg = null;
             if (slide.imagePreviewUrl) {
               slideImg = new Image();
               slideImg.src = slide.imagePreviewUrl;
-              await new Promise((resolve) => { 
-                slideImg.onload = resolve; 
-                slideImg.onerror = () => {
-                  console.warn(`Failed to load image for slide ${i+1}`);
-                  resolve(); 
-                };
-              });
+              await new Promise(r => { slideImg.onload = r; slideImg.onerror = r; });
             }
 
             let audioDurationMs = 3000; 
             let audioBuffer = null;
-
             if (slide.audioBlob) {
               try {
                 const arrayBuffer = await slide.audioBlob.arrayBuffer();
                 audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 audioDurationMs = audioBuffer.duration * 1000;
-              } catch (audioErr) {
-                console.error(`Audio processing failed for slide ${i+1}:`, audioErr);
-              }
+              } catch (e) {}
             } else if (slide.script) {
-               audioDurationMs = Math.max(3000, slide.script.length * 60);
+              audioDurationMs = Math.max(3000, slide.script.length * 60);
             }
 
             currentSlideVisual = { 
-              img: slideImg, 
-              text: `Slide ${i + 1} (No Image)`,
-              sentences: sentences,
-              duration: audioDurationMs,
-              startTime: performance.now()
+              img: slideImg, text: `Slide ${i + 1}`, sentences, 
+              duration: audioDurationMs, startTime: performance.now()
             };
 
             if (audioBuffer) {
@@ -783,398 +506,180 @@ Please return the result ONLY as a JSON array of strings, like this:
           setCompilationProgress("Finalizing video file...");
           isRecording = false; 
           recorder.stop();
-          
           const finalBlob = await recordPromise;
           setFinalVideoUrl(URL.createObjectURL(finalBlob));
-          
-          if (audioCtx.state !== 'closed') {
-            await audioCtx.close();
-          }
+          if (audioCtx.state !== 'closed') await audioCtx.close();
 
-          alert("Video compilation finished! Please note: Automated voice-over in the final video requires an OpenAI API key for best results. Browser voices work for previews but may not record directly in all browsers.");
-          
         } catch (err) {
-          console.error("Compilation failed:", err);
-          alert(err.message || "Video compilation failed. See console for details.");
+          console.error(err);
+          alert("Compilation failed.");
         } finally {
           setIsCompiling(false);
           setCompilationProgress("");
         }
       };
 
+      if (view === 'home') {
+        return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800">
+            <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 border border-slate-100 text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <Sparkles className="text-white w-8 h-8" />
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900 mb-3">Welcome to SlideCaster</h1>
+              <p className="text-slate-600 mb-6 text-sm leading-relaxed">
+                To use automatic slide script generation, please provide your Gemini API Key.
+              </p>
+              <div className="mb-8 text-left">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Gemini API Key</label>
+                <input 
+                  type="password" 
+                  value={userApiKey}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <button onClick={startWithAI} disabled={!userApiKey.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-xl transition-all">Save Key & Start</button>
+                <button onClick={skipAI} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-xl transition-all">Skip AI (Manual)</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
-        <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-10 flex-shrink-0">
-            <div className="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="min-h-screen bg-slate-50 flex flex-col">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+            <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-inner">
                   <Video className="text-white w-5 h-5" />
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-slate-900">SlideCaster</h1>
-                  <p className="text-xs text-slate-500 font-medium tracking-tight">Professional Video Compiler</p>
-                </div>
+                <h1 className="text-xl font-bold text-slate-900">SlideCaster</h1>
               </div>
-              
-              <div className="flex items-center gap-2 flex-wrap justify-center">
-                <button 
-                  onClick={() => setShowVoiceModal(true)}
-                  className="bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  Professional Voice Gallery
-                </button>
-                <input type="file" accept=".pdf" className="hidden" ref={pdfInputRef} onChange={handlePdfUpload} />
-                <input type="file" accept=".docx" className="hidden" ref={wordInputRef} onChange={handleWordUpload} />
+              <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                <Settings className="w-4 h-4 text-slate-500" />
+                <span className="text-slate-600 font-medium">Global Voice:</span>
+                <select value={globalVoice} onChange={(e) => {
+                  setGlobalVoice(e.target.value);
+                  setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
+                }} className="bg-transparent font-semibold text-indigo-700 outline-none">
+                  {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
               </div>
             </div>
           </header>
 
           <main className="max-w-5xl mx-auto px-6 py-8 flex-grow w-full">
             <div className="mb-8 bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex gap-4">
-              <div className="mt-1">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <Upload className="w-4 h-4 text-indigo-600" />
-                </div>
+              <div className="mt-1 bg-indigo-100 w-8 h-8 rounded-full flex items-center justify-center">
+                <Upload className="w-4 h-4 text-indigo-600" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-indigo-900 mb-1">Standard Professional Workflow</h3>
-                <p className="text-sm text-indigo-800/80 mb-4 leading-relaxed">
-                  1. <b>Upload PDF</b> for perfect slide images. 2. <b>Download Template</b> and fill your scripts in Word. 3. <b>Import Word Scripts</b> back here. 4. <b>Compile</b>!
-                </p>
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => pdfInputRef.current?.click()}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center gap-2 active:scale-95"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Step 1: Upload PDF Slides
-                  </button>
-                  <div className="flex gap-1">
-                    <button 
-                      onClick={downloadWordTemplate}
-                      className="bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 text-sm font-bold px-5 py-2.5 rounded-l-xl transition-all flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Step 2: Download Template
-                    </button>
-                    <button 
-                      onClick={() => wordInputRef.current?.click()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 py-2.5 rounded-r-xl transition-all flex items-center gap-2"
-                    >
-                      <FileOutput className="w-4 h-4" />
-                      Step 3: Import Scripts
-                    </button>
-                  </div>
-                </div>
+              <div>
+                <h3 className="font-semibold text-indigo-900 mb-1">How it works</h3>
+                <p className="text-sm text-indigo-800/80 mb-3">Upload your slide images, add scripts, and compile your video.</p>
+                <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleBulkImageUpload} />
+                <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
+                  <Presentation className="w-4 h-4" /> Bulk Upload Slide Images
+                </button>
               </div>
             </div>
 
             <div className="space-y-6 mb-12">
               {slides.map((slide, index) => (
-                <div key={slide.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md hover:border-indigo-200 group">
-                  
-                  <div className="md:w-1/3 bg-slate-50 border-r border-slate-100 relative min-h-[220px] flex items-center justify-center p-4">
+                <div key={slide.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row transition-all hover:shadow-md">
+                  <div className="md:w-1/3 bg-slate-100 border-r border-slate-200 relative group min-h-[200px] flex items-center justify-center p-4">
                     {slide.imagePreviewUrl ? (
                       <>
-                        <img src={slide.imagePreviewUrl} alt={`Slide ${index + 1}`} className="max-h-full max-w-full rounded-lg shadow-sm object-contain" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
-                          <label className="cursor-pointer bg-white text-slate-800 text-xs font-bold px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 hover:bg-slate-50 transition-all active:scale-95">
-                            <Upload className="w-3.5 h-3.5" /> Change
+                        <img src={slide.imagePreviewUrl} alt={`Slide ${index + 1}`} className="max-h-full max-w-full rounded shadow-sm object-contain" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                          <label className="cursor-pointer bg-white text-slate-800 text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 hover:bg-slate-50 transition-all">
+                            <Upload className="w-4 h-4" /> Change Image
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                           </label>
                         </div>
                       </>
                     ) : (
-                      <label className="cursor-pointer w-full h-full min-h-[180px] border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:bg-white hover:border-indigo-400 hover:text-indigo-600 transition-all">
-                        <Presentation className="w-10 h-10 mb-2 opacity-30" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Empty Slide</span>
+                      <label className="cursor-pointer w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-all">
+                        <Presentation className="w-8 h-8 mb-2 opacity-50" />
+                        <span className="text-sm font-medium text-center">Upload Slide Image</span>
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                       </label>
                     )}
-                    <div className="absolute top-4 left-4 bg-slate-900 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full shadow-lg">
-                      {index + 1}
-                    </div>
-                    
-                    <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleMoveSlide(index, -1)}
-                        disabled={index === 0}
-                        className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:text-indigo-600 disabled:opacity-30 shadow-sm"
-                      >
-                        <ArrowUp className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleMoveSlide(index, 1)}
-                        disabled={index === slides.length - 1}
-                        className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-600 hover:text-indigo-600 disabled:opacity-30 shadow-sm"
-                      >
-                        <ArrowDown className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <div className="absolute top-3 left-3 bg-white/90 text-slate-700 text-xs font-bold px-2 py-1 rounded shadow-sm border border-slate-200/50">{index + 1}</div>
                   </div>
 
-                  <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5" /> Script
-                      </label>
-                      <button 
-                        onClick={() => handleRemoveSlide(slide.id)}
-                        className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                        title="Delete Slide"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                    
-                    <div className="relative flex-1 group/script">
-                      <textarea 
-                        className="w-full h-full min-h-[120px] bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm resize-none focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all placeholder:text-slate-300 font-medium leading-relaxed"
-                        placeholder="Paste your slide script here or edit its contents..."
-                        value={slide.script || ""}
-                        onChange={(e) => updateSlide(slide.id, { script: e.target.value })}
-                      />
-                      <button 
-                        onClick={async () => {
-                          const text = await navigator.clipboard.readText();
-                          if (text) updateSlide(slide.id, { script: text });
-                        }}
-                        className="absolute bottom-4 right-4 bg-white border border-slate-200 text-[10px] font-bold px-2 py-1 rounded-md opacity-0 group-focus-within/script:opacity-100 hover:bg-slate-50 transition-all flex items-center gap-1 shadow-sm"
-                      >
-                        <Clipboard className="w-3 h-3" /> Paste
-                      </button>
-                    </div>
-
-                    <div className="mt-5 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-50">
-                      <div className="flex items-center gap-3">
-                        {slide.audioUrl ? (
-                          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                            <span className="text-[10px] font-bold text-emerald-700 truncate max-w-[120px]">{slide.audioName || 'Audio Ready'}</span>
-                            <button onClick={() => playAudio(slide.audioUrl)} className="text-emerald-600 hover:text-emerald-800"><Play className="w-4 h-4" /></button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-300 uppercase italic">No Audio Uploaded</span>
-                        )}
-                      </div>
-                      
+                  <div className="p-5 flex-1 flex flex-col">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Mic className="w-4 h-4 text-slate-400" /> Voiceover Script</label>
                       <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => generateAudioForSlide(slide.id)}
-                          disabled={!(slide.script || "").trim() || slide.isGenerating}
-                          className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] font-black px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-slate-200"
-                        >
-                          {slide.isGenerating ? (
-                             <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
-                          ) : (
-                             <><Mic className="w-3.5 h-3.5" /> {slide.audioUrl ? "Regenerate Voice" : "Generate Voice"}</>
-                          )}
+                        <button onClick={() => autoGenerateScript(slide.id)} disabled={!slide.imagePreviewUrl || slide.isGeneratingScript || aiStatus !== 'ready'} className="text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                          {slide.isGeneratingScript ? <><Loader2 className="w-3 h-3 animate-spin"/> {slide.scriptGenerationProgress}</> : <><Sparkles className="w-3 h-3"/> AI Script</>}
                         </button>
-                        
-                        <button 
-                          onClick={() => speakText(slide.script, selectedVoice)}
-                          className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2"
-                        >
-                          <Play className="w-3.5 h-3.5" /> Listen
+                        <button onClick={() => handleRemoveSlide(slide.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4"/></button>
+                      </div>
+                    </div>
+                    <textarea value={slide.script} onChange={(e) => updateSlide(slide.id, { script: e.target.value })} className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400" placeholder="Type the script here..."/>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
+                      <select value={slide.voice} onChange={(e) => updateSlide(slide.id, { voice: e.target.value })} className="text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500">
+                        {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                      <div className="flex items-center gap-2">
+                        {slide.audioUrl && <button onClick={() => playAudio(slide.audioUrl)} className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200"><Play className="w-4 h-4 ml-0.5"/></button>}
+                        <button onClick={() => generateAudioForSlide(slide.id)} disabled={!(slide.script || "").trim() || slide.isGenerating} className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+                          {slide.isGenerating ? <><Loader2 className="w-4 h-4 animate-spin"/> Generating...</> : <><Mic className="w-4 h-4"/> Generate Voice</>}
                         </button>
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
-
-              <button 
-                onClick={handleAddSlide}
-                className="w-full py-6 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-bold flex items-center justify-center gap-2 hover:bg-white hover:border-indigo-400 hover:text-indigo-600 transition-all group"
-              >
-                <Plus className="w-5 h-5 group-hover:scale-125 transition-transform" /> Add Slide
+              <button onClick={handleAddSlide} className="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 font-medium flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-600 transition-all">
+                <Plus className="w-5 h-5"/> Add Another Slide
               </button>
             </div>
           </main>
 
-          {showImportModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-              <div className="bg-white rounded-[2rem] max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-100">
-                <div className="p-8 pb-4 flex justify-between items-center">
-                  <h2 className="text-xl font-black text-slate-900">Bulk Import Scripts</h2>
-                  <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 p-2 bg-slate-50 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-8 pt-0">
-                  <p className="text-sm text-slate-500 mb-4 leading-relaxed">Paste the JSON array or list of sentences generated by your AI below. We will match them Slide-by-Slide.</p>
-                  <textarea 
-                    className="w-full h-64 bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all mb-6"
-                    placeholder='["Slide 1 script...", "Slide 2 script..."]'
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                  />
-                  <div className="flex gap-3">
-                    <button 
-                      onClick={handleImportScripts}
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-200 active:scale-95"
-                    >
-                      Process & Import
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
-            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-slate-500 font-medium flex items-center gap-4">
-                <span>Total Slides: <span className="text-slate-900">{slides.length}</span></span>
-                <div className="h-4 w-px bg-slate-200"></div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Voice:</span>
-                  <button 
-                    onClick={() => setShowVoiceModal(true)}
-                    className="bg-slate-50 border border-slate-200 text-xs font-semibold px-3 py-1.5 rounded-md hover:border-indigo-400 transition-all flex items-center gap-2"
-                  >
-                    <Sparkles className="w-3 h-3 text-indigo-500" />
-                    {browserVoices.find(v => v.voiceURI === selectedVoice)?.name || "Select Voice"}
-                  </button>
-                </div>
-              </div>
-              
-              <button 
-                onClick={compileVideo}
-                disabled={isCompiling || slides.length === 0}
-                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
-              >
-                {isCompiling ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> {compilationProgress}</>
-                ) : (
-                  <><Video className="w-5 h-5" /> Compile Video</>
-                )}
+          <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-lg z-20">
+            <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+              <div className="text-sm text-slate-500 font-medium">Total Slides: <span className="text-slate-900">{slides.length}</span></div>
+              <button onClick={compileVideo} disabled={isCompiling || slides.length === 0} className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white font-semibold px-8 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2">
+                {isCompiling ? <><Loader2 className="w-5 h-5 animate-spin"/> {compilationProgress}</> : <><Video className="w-5 h-5"/> Compile Video</>}
               </button>
             </div>
-          </div>
-
-          {showVoiceModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-              <div className="bg-white rounded-[2rem] max-w-2xl w-full max-h-[80vh] shadow-2xl overflow-hidden animate-in zoom-in duration-200 border border-slate-100 flex flex-col">
-                <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900">Professional Voice Library</h2>
-                    <p className="text-xs text-slate-500 font-medium">Select a studio-quality realistic voice for your slides</p>
-                  </div>
-                  <button onClick={() => setShowVoiceModal(false)} className="text-slate-400 hover:text-slate-600 p-2 bg-slate-50 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-                </div>
-                
-                <div className="p-8 overflow-y-auto flex-1">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <h3 className="text-[10px] uppercase font-black text-indigo-600 tracking-widest">Gemini High-Fidelity Voices</h3>
-                        <span className="bg-indigo-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">NEW STUDIO QUALITY</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {VOICES.map(voiceName => (
-                          <div 
-                            key={voiceName} 
-                            onClick={() => { setSelectedVoice(voiceName); setShowVoiceModal(false); }}
-                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${selectedVoice === voiceName ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-100 hover:border-indigo-200 hover:bg-slate-50'}`}
-                          >
-                            <div className="flex justify-between items-center relative z-10">
-                              <span className="font-bold text-sm text-slate-800">{voiceName}</span>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); speakText(voiceName, voiceName); /* Just sample preview if implemented */ }}
-                                className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all"
-                              >
-                                <Play className="w-4 h-4" />
-                              </button>
-                            </div>
-                            {selectedVoice === voiceName && <div className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-tl-2xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                    <b>Professional Library:</b> These voices are generated using Gemini 2.5 Flash and offer human-like intonation and clarity.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          </footer>
 
           {finalVideoUrl && (
             <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
               <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-slate-900">Your Video is Ready!</h2>
-                  <button 
-                    onClick={() => setFinalVideoUrl(null)}
-                    className="text-slate-400 hover:text-slate-600 p-2"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center text-slate-900">
+                  <h2 className="text-2xl font-bold">Your Video is Ready!</h2>
+                  <button onClick={() => setFinalVideoUrl(null)} className="text-slate-400 hover:text-slate-600 p-2"><XIcon className="w-5 h-5"/></button>
                 </div>
-                
-                <div className="bg-slate-100 p-6 flex justify-center">
-                  <video 
-                    src={finalVideoUrl} 
-                    controls 
-                    className="max-h-[50vh] rounded-xl shadow-md bg-black"
-                  />
-                </div>
-                
+                <div className="bg-slate-100 p-6 flex justify-center"><video src={finalVideoUrl} controls className="max-h-[50vh] rounded-xl shadow-md bg-black"/></div>
                 <div className="p-6 flex justify-end gap-3 bg-slate-50 border-t border-slate-100">
-                  <button 
-                    onClick={() => setFinalVideoUrl(null)}
-                    className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-colors"
-                  >
-                    Back to Editor
-                  </button>
-                  <a 
-                    href={finalVideoUrl} 
-                    download="Presentation_Video.webm"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
-                  >
-                    <Download className="w-5 h-5" /> Download Video
-                  </a>
+                  <button onClick={() => setFinalVideoUrl(null)} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-all">Back to Editor</button>
+                  <a href={finalVideoUrl} download="Video.webm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all"><Download className="w-5 h-5"/> Download Video</a>
                 </div>
               </div>
             </div>
           )}
-
           <div className="h-24"></div> 
         </div>
       );
     }
 
     class AppErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null, errorInfo: null };
-      }
-
-      static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-      }
-
-      componentDidCatch(error, errorInfo) {
-        console.error("ErrorBoundary caught an error", error, errorInfo);
-        this.setState({ errorInfo });
-      }
-
+      constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+      static getDerivedStateFromError(error) { return { hasError: true, error }; }
       render() {
         if (this.state.hasError) {
           return (
-            <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#fef2f2', color: '#991b1b', height: '100vh' }}>
-              <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Application Crash Detected</h1>
-              <p>The code encountered a critical module or render error. See details below:</p>
-              <pre style={{ background: 'white', padding: '10px', marginTop: '10px', border: '1px solid #fca5a5', overflow: 'auto' }}>
-                {this.state.error && this.state.error.toString()}
-              </pre>
+            <div className="p-10 bg-red-50 text-red-900 h-screen font-sans">
+              <h1 className="text-2xl font-bold">Application Crash Detected</h1>
+              <pre className="mt-4 p-4 bg-white border border-red-200 rounded overflow-auto">{this.state.error && this.state.error.toString()}</pre>
             </div>
           );
         }
@@ -1183,11 +688,7 @@ Please return the result ONLY as a JSON array of strings, like this:
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(
-      <AppErrorBoundary>
-        <SlideCasterApp />
-      </AppErrorBoundary>
-    );
+    root.render(<AppErrorBoundary><SlideCasterApp /></AppErrorBoundary>);
   </script>
 </body>
 </html>
