@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SlideCaster - Gemini Pro Video Generator</title>
+  <title>Reel Maker - AI Video Generator</title>
   
   <!-- CDNs for React, Tailwind, and Libraries -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -11,7 +11,6 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
   
@@ -180,8 +179,23 @@
       URL.revokeObjectURL(url);
     }
 
-    function SlideCasterApp() {
+    function ReelMakerApp() {
+      const MUSIC_LIBRARY = [
+        { name: "None", url: "" },
+        { name: "Bumbly March (Upbeat)", url: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Bumbly_March.ogg" },
+        { name: "The Complex (Ambient)", url: "https://upload.wikimedia.org/wikipedia/commons/e/ea/The_Complex.ogg" },
+        { name: "Acoustic Breeze", url: "https://upload.wikimedia.org/wikipedia/commons/2/25/Acoustic_Breeze.ogg" }
+      ];
+      const STICKER_LIBRARY = ["😀", "😂", "🥰", "😎", "🎉", "✨", "🔥", "💡", "⭐", "❤️", "👍", "🚀", "👀", "💯", "⚠️"];
+      const FONT_LIBRARY = ["Inter", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
+      const ANIMATION_TYPES = ["none", "fade", "slide-left"];
+
       const [view, setView] = useState('home'); // 'home' or 'app'
+      const [layout, setLayout] = useState('16:9'); // '16:9' or '9:16'
+      const [backgroundMusic, setBackgroundMusic] = useState('');
+      const [musicVolume, setMusicVolume] = useState(0.2);
+      const [voiceVolume, setVoiceVolume] = useState(1.0);
+      const [transitionType, setTransitionType] = useState('none');
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
       const [userApiKey, setUserApiKey] = useState('');
       const [globalVoice, setGlobalVoice] = useState("Kore");
@@ -210,7 +224,9 @@
           isGenerating: false, 
           voice: "Kore",
           isGeneratingScript: false,
-          scriptGenerationProgress: ""
+          scriptGenerationProgress: "",
+          texts: [],
+          stickers: []
         }
       ]);
       
@@ -220,81 +236,6 @@
       const [finalExtensionState, setFinalExtension] = useState("mp4");
 
       const fileInputRef = useRef(null);
-      const pdfInputRef = useRef(null);
-
-      const handlePdfUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        try {
-          if (typeof pdfjsLib === 'undefined') {
-             alert('PDF library not loaded.');
-             return;
-          }
-          if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-          }
-
-          const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-          const numPages = pdf.numPages;
-          if (numPages === 0) return;
-
-          const currentNonEmptyCount = (slides.length === 1 && !slides[0].imageFile && !slides[0].script) ? 0 : slides.length;
-          if (currentNonEmptyCount + numPages > 10) {
-            alert(`You can only have up to 10 slides per project. Trying to add ${numPages} slides to your existing ${currentNonEmptyCount} slides exceeds the limit.`);
-            if (pdfInputRef.current) {
-              pdfInputRef.current.value = '';
-            }
-            return;
-          }
-
-          const newSlides = [];
-          for (let i = 1; i <= numPages; i++) {
-            const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 2.0 }); 
-            
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            
-            await page.render({ canvasContext: ctx, viewport }).promise;
-
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            const imageFile = new File([blob], `slide_${i}.png`, { type: 'image/png' });
-            
-            newSlides.push({
-              id: Date.now() + i + Math.random(),
-              imageFile: imageFile,
-              imagePreviewUrl: URL.createObjectURL(imageFile),
-              script: "",
-              audioBlob: null,
-              audioUrl: null,
-              isGenerating: false,
-              voice: globalVoice,
-              isGeneratingScript: false,
-              scriptGenerationProgress: ""
-            });
-          }
-
-          setSlides(prev => {
-            if (prev.length === 1 && !prev[0].imageFile && !prev[0].script) {
-              return newSlides;
-            } else {
-              return [...prev, ...newSlides];
-            }
-          });
-
-        } catch (error) {
-          console.error("PDF upload failed:", error);
-          alert("Failed to parse PDF file. Ensure it is a valid PDF.");
-        } finally {
-          if (pdfInputRef.current) {
-            pdfInputRef.current.value = '';
-          }
-        }
-      };
 
       // --- Professional API Layer with Full Diagnostics ---
       const safeGeminiFetch = async (url, payload, maxRetries = 4) => {
@@ -475,6 +416,22 @@
 
       const updateSlide = (id, updates) => {
         setSlides(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      };
+
+      const addTextToSlide = (id) => {
+        setSlides(prev => prev.map(s => s.id === id ? { ...s, texts: [...(s.texts || []), { id: Date.now(), text: "New Text", x: 50, y: 50, font: "Inter", fontSize: 40, color: "#ffffff" }] } : s));
+      };
+
+      const addStickerToSlide = (id, emoji) => {
+        setSlides(prev => prev.map(s => s.id === id ? { ...s, stickers: [...(s.stickers || []), { id: Date.now(), emoji, x: 50, y: 50, size: 60 }] } : s));
+      };
+
+      const updateOverlay = (slideId, type, overlayId, updates) => {
+        setSlides(prev => prev.map(s => s.id === slideId ? { ...s, [type]: (s[type] || []).map(o => o.id === overlayId ? { ...o, ...updates } : o) } : s));
+      };
+
+      const removeOverlay = (slideId, type, overlayId) => {
+        setSlides(prev => prev.map(s => s.id === slideId ? { ...s, [type]: (s[type] || []).filter(o => o.id !== overlayId) } : s));
       };
 
       const handleImageUpload = (id, e) => {
@@ -790,8 +747,8 @@
 
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = 1280;
-          canvas.height = 720;
+          canvas.width = layout === '16:9' ? 1280 : 720;
+          canvas.height = layout === '16:9' ? 720 : 1280;
           const ctx = canvas.getContext('2d');
 
           const getStream = canvas.captureStream || canvas.mozCaptureStream;
@@ -800,6 +757,29 @@
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           const audioCtx = new AudioContextClass({ sampleRate: 44100 });
           const dest = audioCtx.createMediaStreamDestination();
+
+          const voiceGain = audioCtx.createGain();
+          voiceGain.gain.value = voiceVolume;
+          voiceGain.connect(dest);
+
+          let musicSourceRef = null;
+          if (backgroundMusic) {
+            try {
+              const res = await fetch(backgroundMusic);
+              const ab = await res.arrayBuffer();
+              const musicBuffer = await audioCtx.decodeAudioData(ab);
+              const musicSource = audioCtx.createBufferSource();
+              musicSource.buffer = musicBuffer;
+              musicSource.loop = true;
+              
+              const bgGain = audioCtx.createGain();
+              bgGain.gain.value = musicVolume;
+              musicSource.connect(bgGain);
+              bgGain.connect(dest);
+              musicSource.start(0);
+              musicSourceRef = musicSource;
+            } catch(e) { console.error("Could not load bg music:", e); }
+          }
 
           const canvasStream = getStream.call(canvas, 30); 
           
@@ -916,19 +896,71 @@
           if (audioCtx.state === 'suspended') await audioCtx.resume();
 
           let currentSlideVisual = null;
+          let previousSlideVisual = null;
+          let transitionStartTime = null;
 
           const renderLoop = () => {
             if (!isRecording) return;
             ctx.fillStyle = '#000000'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (currentSlideVisual && currentSlideVisual.img) {
-              const img = currentSlideVisual.img;
-              const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-              const w = img.width * scale;
-              const h = img.height * scale;
-              ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+            const drawVisual = (visual, xOffset = 0, alpha = 1) => {
+              if (!visual) return;
+              ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+              if (visual.img) {
+                const img = visual.img;
+                const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+                const w = img.width * scale;
+                const h = img.height * scale;
+                ctx.drawImage(img, xOffset + (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+              }
+
+              (visual.stickers || []).forEach(stk => {
+                ctx.font = `${stk.size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const sx = xOffset + (stk.x / 100) * canvas.width;
+                const sy = (stk.y / 100) * canvas.height;
+                ctx.fillText(stk.emoji, sx, sy);
+              });
+
+              (visual.texts || []).forEach(txt => {
+                ctx.font = `bold ${txt.fontSize}px "${txt.font}", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = txt.color;
+                const tx = xOffset + (txt.x / 100) * canvas.width;
+                const ty = (txt.y / 100) * canvas.height;
+                ctx.fillText(txt.text, tx, ty);
+              });
+              ctx.globalAlpha = 1.0;
+            };
+
+            const now = performance.now();
+            let transitionProgress = 0;
+            const transitionDuration = 800; // ms transition length
+
+            if (transitionType !== 'none' && previousSlideVisual && transitionStartTime) {
+               transitionProgress = (now - transitionStartTime) / transitionDuration;
+               if (transitionProgress >= 1) previousSlideVisual = null;
+            } else {
+               previousSlideVisual = null;
             }
+
+            if (previousSlideVisual) {
+              if (transitionType === 'fade') {
+                drawVisual(previousSlideVisual, 0, 1 - transitionProgress);
+                drawVisual(currentSlideVisual, 0, transitionProgress);
+              } else if (transitionType === 'slide-left') {
+                const xOffsetPrev = -(transitionProgress * canvas.width);
+                const xOffsetCurr = canvas.width - (transitionProgress * canvas.width);
+                drawVisual(previousSlideVisual, xOffsetPrev, 1);
+                drawVisual(currentSlideVisual, xOffsetCurr, 1);
+              }
+            } else {
+              drawVisual(currentSlideVisual, 0, 1);
+            }
+
             requestAnimationFrame(renderLoop);
           };
           
@@ -960,15 +992,19 @@
               audioDurationMs = Math.max(3000, slide.script.length * 70);
             }
 
+            previousSlideVisual = currentSlideVisual;
+            if (previousSlideVisual) transitionStartTime = performance.now();
+
             currentSlideVisual = { 
               img: slideImg, sentences, 
-              duration: audioDurationMs, nowAtStart: performance.now()
+              duration: audioDurationMs, nowAtStart: performance.now(),
+              texts: slide.texts || [], stickers: slide.stickers || []
             };
 
             if (audioBuffer) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffer;
-                source.connect(dest);
+                source.connect(voiceGain);
                 source.start();
                 await new Promise(r => { source.onended = r; });
             } else {
@@ -984,6 +1020,7 @@
           
           // Stop stream capture
           isRecording = false; 
+          if (musicSourceRef) musicSourceRef.stop();
           videoTrack.stop();
           audioTrack.stop();
 
@@ -1035,6 +1072,22 @@
                 </div>
               </div>
 
+              <div className="mb-6 text-left">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Video Layout Mode</label>
+                <div className="flex gap-4">
+                  <label className={`flex-1 cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center gap-2 transition-all ${layout === '16:9' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+                    <input type="radio" name="layout" value="16:9" checked={layout === '16:9'} onChange={(e) => setLayout(e.target.value)} className="hidden" />
+                    <div className="w-16 h-9 bg-slate-200 rounded border border-slate-300 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-500">16:9</span></div>
+                    <span className="text-sm font-semibold text-slate-700">Landscape wide</span>
+                  </label>
+                  <label className={`flex-1 cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center gap-2 transition-all ${layout === '9:16' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+                    <input type="radio" name="layout" value="9:16" checked={layout === '9:16'} onChange={(e) => setLayout(e.target.value)} className="hidden" />
+                    <div className="w-9 h-16 bg-slate-200 rounded border border-slate-300 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-500">9:16</span></div>
+                    <span className="text-sm font-semibold text-slate-700">Vertical Reel</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="mb-8 text-left">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Gemini API Key</label>
                 <input 
@@ -1062,7 +1115,7 @@
                   <PlayIcon className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-xl font-bold text-slate-900 leading-none mb-1">SlideCaster</h1>
+                  <h1 className="text-xl font-bold text-slate-900 leading-none mb-1">Reel Maker</h1>
                   <input 
                     value={projectName} 
                     onChange={(e) => setProjectName(e.target.value)}
@@ -1071,10 +1124,40 @@
                   />
                 </div>
               </div>
+              
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                  <SettingsIcon className="w-4 h-4 text-slate-500" />
-                  <span className="text-slate-600 font-medium">Global Voice:</span>
+                <div className="flex items-center gap-4 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">Music:</span>
+                    <select value={backgroundMusic} onChange={(e) => setBackgroundMusic(e.target.value)} className="bg-transparent font-semibold outline-none max-w-[120px] truncate text-indigo-700">
+                      {MUSIC_LIBRARY.map(m => <option key={m.name} value={m.url}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                  <div className="flex items-center gap-2" title="Music Volume">
+                    <span className="text-xs">🎵</span>
+                    <input type="range" min="0" max="1" step="0.1" value={musicVolume} onChange={(e) => setMusicVolume(parseFloat(e.target.value))} className="w-16 accent-indigo-600" />
+                  </div>
+                  <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                  <div className="flex items-center gap-2" title="Voiceover Volume">
+                    <span className="text-xs">🎤</span>
+                    <input type="range" min="0" max="1" step="0.1" value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))} className="w-16 accent-indigo-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <span className="text-slate-600 font-medium">Transition:</span>
+                  <select value={transitionType} onChange={(e) => setTransitionType(e.target.value)} className="bg-transparent font-semibold text-indigo-700 outline-none">
+                    {ANIMATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <span className="text-slate-600 font-medium">Voice:</span>
                   <select value={globalVoice} onChange={(e) => {
                     setGlobalVoice(e.target.value);
                     setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
@@ -1179,6 +1262,49 @@
                       </div>
                     </div>
                     <textarea value={slide.script} onChange={(e) => updateSlide(slide.id, { script: e.target.value })} className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400" placeholder="Type the script here..."/>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="text-sm font-semibold text-slate-700">Image Overlays</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => addTextToSlide(slide.id)} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-medium">+ Text</button>
+                          <div className="relative group/sticker">
+                            <button className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-medium">+ Sticker</button>
+                            <div className="absolute bottom-full right-0 mb-2 hidden group-hover/sticker:grid grid-cols-5 gap-1 p-2 bg-white border border-slate-200 rounded-lg shadow-xl w-[200px] z-20">
+                              {STICKER_LIBRARY.map(emoji => (
+                                <button key={emoji} onClick={(e) => { e.stopPropagation(); addStickerToSlide(slide.id, emoji); }} className="text-xl hover:bg-slate-100 p-1 rounded transition-colors">{emoji}</button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                        {(slide.texts || []).map(txt => (
+                          <div key={txt.id} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs flex flex-wrap gap-2 items-center">
+                            <span className="font-bold text-slate-400">T</span>
+                            <input type="text" value={txt.text} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { text: e.target.value })} className="flex-1 min-w-[80px] px-1.5 py-1 border border-slate-200 rounded text-slate-800" />
+                            <input type="color" value={txt.color} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { color: e.target.value })} className="w-6 h-6 p-0 border-0 rounded cursor-pointer" title="Color" />
+                            <select value={txt.font} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { font: e.target.value })} className="px-1 py-1 border border-slate-200 rounded text-slate-700 max-w-[80px]">
+                              {FONT_LIBRARY.map(f => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                            <label className="flex items-center gap-1 text-slate-500">px:<input type="number" value={txt.fontSize} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { fontSize: parseInt(e.target.value)||20 })} className="w-12 px-1 py-1 border border-slate-200 rounded text-slate-800"/></label>
+                            <label className="flex items-center gap-1 text-slate-500" title="Horizontal Position">X%:<input type="range" min="0" max="100" value={txt.x} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { x: parseInt(e.target.value) })} className="w-12 accent-indigo-500"/></label>
+                            <label className="flex items-center gap-1 text-slate-500" title="Vertical Position">Y%:<input type="range" min="0" max="100" value={txt.y} onChange={e => updateOverlay(slide.id, 'texts', txt.id, { y: parseInt(e.target.value) })} className="w-12 accent-indigo-500"/></label>
+                            <button onClick={() => removeOverlay(slide.id, 'texts', txt.id)} className="text-rose-500 hover:bg-rose-50 p-1 rounded ml-auto flex-shrink-0"><XIcon className="w-3 h-3"/></button>
+                          </div>
+                        ))}
+                        {(slide.stickers || []).map(stk => (
+                          <div key={stk.id} className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-xs flex flex-wrap gap-2 items-center">
+                            <span className="text-base">{stk.emoji}</span>
+                            <label className="flex items-center gap-1 text-slate-500">Size:<input type="number" value={stk.size} onChange={e => updateOverlay(slide.id, 'stickers', stk.id, { size: parseInt(e.target.value)||40 })} className="w-12 px-1 py-1 border border-slate-200 rounded text-slate-800"/></label>
+                            <label className="flex items-center gap-1 text-slate-500" title="Horizontal Position">X%:<input type="range" min="0" max="100" value={stk.x} onChange={e => updateOverlay(slide.id, 'stickers', stk.id, { x: parseInt(e.target.value) })} className="w-16 accent-indigo-500"/></label>
+                            <label className="flex items-center gap-1 text-slate-500" title="Vertical Position">Y%:<input type="range" min="0" max="100" value={stk.y} onChange={e => updateOverlay(slide.id, 'stickers', stk.id, { y: parseInt(e.target.value) })} className="w-16 accent-indigo-500"/></label>
+                            <button onClick={() => removeOverlay(slide.id, 'stickers', stk.id)} className="text-rose-500 hover:bg-rose-50 p-1 rounded ml-auto flex-shrink-0"><XIcon className="w-3 h-3"/></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
                       <select value={slide.voice} onChange={(e) => updateSlide(slide.id, { voice: e.target.value })} className="text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500">
                         {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
