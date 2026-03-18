@@ -182,23 +182,25 @@
     function ReelMakerApp() {
       const MUSIC_LIBRARY = [
         { name: "None", url: "" },
-        { name: "Bumbly March (Upbeat)", url: "https://upload.wikimedia.org/wikipedia/commons/4/4c/Bumbly_March.ogg" },
-        { name: "The Complex (Ambient)", url: "https://upload.wikimedia.org/wikipedia/commons/e/ea/The_Complex.ogg" },
-        { name: "Acoustic Breeze", url: "https://upload.wikimedia.org/wikipedia/commons/2/25/Acoustic_Breeze.ogg" },
-        { name: "Sunny Day (Happy)", url: "https://upload.wikimedia.org/wikipedia/commons/5/5a/Sunny_Day_-_Anno_Domini_Beats.ogg" },
-        { name: "Espionage (Dark)", url: "https://upload.wikimedia.org/wikipedia/commons/b/b4/Espionage.ogg" },
-        { name: "Clear Day (Calm)", url: "https://upload.wikimedia.org/wikipedia/commons/0/0c/Clear_Day_%28Demo%29.ogg" },
-        { name: "Little Idea (Fun)", url: "https://upload.wikimedia.org/wikipedia/commons/5/55/Little_Idea.ogg" },
-        { name: "Motions (Cinematic)", url: "https://upload.wikimedia.org/wikipedia/commons/0/04/Motions.ogg" },
-        { name: "Rains Will Fall (Dramatic)", url: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Rains_Will_Fall.ogg" },
-        { name: "Ossuary 6 Air (Piano)", url: "https://upload.wikimedia.org/wikipedia/commons/3/3e/Ossuary_6_-_Air.ogg" },
-        { name: "Perspectives (Corporate)", url: "https://upload.wikimedia.org/wikipedia/commons/1/11/Perspectives.ogg" },
-        { name: "Digital Solitude (Lo-Fi)", url: "https://upload.wikimedia.org/wikipedia/commons/2/2b/Digital_Solitude.ogg" },
-        { name: "Unnatural Situation (Tense)", url: "https://upload.wikimedia.org/wikipedia/commons/4/4e/Unnatural_Situation_-_Kevin_MacLeod.ogg" },
-        { name: "Dewdrop Fantasy (Dreamy)", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/Dewdrop_Fantasy.ogg" },
-        { name: "Wholesome (Feel Good)", url: "https://upload.wikimedia.org/wikipedia/commons/1/18/Wholesome.ogg" },
-        { name: "Pamgaea (Epic)", url: "https://upload.wikimedia.org/wikipedia/commons/c/ca/Pamgaea.ogg" },
-        { name: "Crypto (Tech)", url: "https://upload.wikimedia.org/wikipedia/commons/7/7d/Crypto.ogg" }
+        { name: "Inspired (Uplifting)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Inspired.mp3" },
+        { name: "Wholesome (Feel Good)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wholesome.mp3" },
+        { name: "Carefree (Happy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3" },
+        { name: "Cipher2 (Tech)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cipher2.mp3" },
+        { name: "Hiding Your Reality (Dark)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hiding%20Your%20Reality.mp3" },
+        { name: "Merry Go (Playful)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3" },
+        { name: "Perspectives (Corporate)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Perspectives.mp3" },
+        { name: "Pixelland (Retro)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Pixelland.mp3" },
+        { name: "Vivacity (Energetic)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Vivacity.mp3" },
+        { name: "Airport Lounge (Calm)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3" },
+        { name: "Garden Music (Nature)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Garden%20Music.mp3" },
+        { name: "Backed Vibes (Chill)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3" },
+        { name: "Wish Background (Dreamy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wish%20Background.mp3" },
+        { name: "Sneaky Snitch (Fun)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3" },
+        { name: "Smooth Lovin (Jazz)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3" },
+        { name: "Elevator (Lo-Fi)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3" },
+        { name: "Gymnopedie No 1 (Piano)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3" },
+        { name: "Monkeys Spinning (Comedy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3" },
+        { name: "Sugar Plum Fairy (Classic)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3" }
       ];
       const STICKER_LIBRARY = ["😀", "😂", "🥰", "😎", "🎉", "✨", "🔥", "💡", "⭐", "❤️", "👍", "🚀", "👀", "💯", "⚠️"];
       const FONT_LIBRARY = ["Inter", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
@@ -680,10 +682,12 @@
         const containerRef = useRef(null);
         const [localTexts, setLocalTexts] = useState([...(slide.texts || [])]);
         const [localStickers, setLocalStickers] = useState([...(slide.stickers || [])]);
+        const [selectedOverlay, setSelectedOverlay] = useState(null); // { type: 'texts'|'stickers', id }
         const [dragging, setDragging] = useState(null); // { type, id, offsetX, offsetY }
 
         const handlePointerDown = (e, type, id) => {
           e.preventDefault();
+          setSelectedOverlay({ type, id });
           const rect = containerRef.current.getBoundingClientRect();
           const clientX = e.touches ? e.touches[0].clientX : e.clientX;
           const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -717,47 +721,111 @@
           onClose();
         };
 
+        const selectedText = selectedOverlay?.type === 'texts' ? localTexts.find(t => t.id === selectedOverlay.id) : null;
+        const selectedSticker = selectedOverlay?.type === 'stickers' ? localStickers.find(s => s.id === selectedOverlay.id) : null;
+
         return (
           <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
             onMouseMove={handlePointerMove} onMouseUp={handlePointerUp}
-            onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}>
-            <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+            onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
+            onClick={() => setSelectedOverlay(null)}>
+            <div className="bg-white rounded-3xl max-w-5xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
                 <h2 className="text-lg font-bold text-slate-900">Edit Image Overlays</h2>
                 <div className="flex gap-2">
-                  <button onClick={() => setLocalTexts(prev => [...prev, { id: Date.now(), text: "New Text", x: 50, y: 50, font: "Inter", fontSize: 40, color: "#ffffff" }])} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">+ Text</button>
+                  <button onClick={() => { const newId = Date.now(); setLocalTexts(prev => [...prev, { id: newId, text: "New Text", x: 50, y: 50, font: "Inter", fontSize: 40, color: "#ffffff" }]); setSelectedOverlay({ type: 'texts', id: newId }); }} className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">+ Text</button>
                   <div className="relative group/stk">
                     <button className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">+ Sticker</button>
                     <div className="absolute bottom-full right-0 mb-2 hidden group-hover/stk:grid grid-cols-5 gap-1 p-2 bg-white border border-slate-200 rounded-lg shadow-xl w-[200px] z-20">
                       {STICKER_LIBRARY.map(emoji => (
-                        <button key={emoji} onClick={(ev) => { ev.stopPropagation(); setLocalStickers(prev => [...prev, { id: Date.now() + Math.random(), emoji, x: 50, y: 50, size: 60 }]); }} className="text-xl hover:bg-slate-100 p-1 rounded transition-colors">{emoji}</button>
+                        <button key={emoji} onClick={(ev) => { ev.stopPropagation(); const newId = Date.now() + Math.random(); setLocalStickers(prev => [...prev, { id: newId, emoji, x: 50, y: 50, size: 60 }]); setSelectedOverlay({ type: 'stickers', id: newId }); }} className="text-xl hover:bg-slate-100 p-1 rounded transition-colors">{emoji}</button>
                       ))}
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="bg-slate-900 p-4 flex justify-center">
-                <div ref={containerRef} className="relative inline-block select-none" style={{ maxHeight: '60vh' }}>
-                  <img src={slide.imagePreviewUrl} alt="Slide" className="max-h-[60vh] max-w-full rounded-lg" draggable={false} />
-                  {localTexts.map(txt => (
-                    <div key={txt.id} style={{ position: 'absolute', left: `${txt.x}%`, top: `${txt.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${txt.fontSize}px`, fontFamily: `"${txt.font}", sans-serif`, color: txt.color, fontWeight: 'bold', cursor: 'grab', textShadow: '1px 1px 4px rgba(0,0,0,0.7)', userSelect: 'none', whiteSpace: 'nowrap' }}
-                      onMouseDown={(ev) => handlePointerDown(ev, 'texts', txt.id)}
-                      onTouchStart={(ev) => handlePointerDown(ev, 'texts', txt.id)}>
-                      {txt.text}
-                      <button onClick={(ev) => { ev.stopPropagation(); setLocalTexts(prev => prev.filter(t => t.id !== txt.id)); }} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-rose-600" style={{cursor:'pointer'}}>✕</button>
+              <div className="flex flex-1 overflow-hidden">
+                <div className="flex-1 bg-slate-900 p-4 flex justify-center items-center overflow-auto">
+                  <div ref={containerRef} className="relative inline-block select-none" style={{ maxHeight: '60vh' }}>
+                    <img src={slide.imagePreviewUrl} alt="Slide" className="max-h-[60vh] max-w-full rounded-lg" draggable={false} />
+                    {localTexts.map(txt => (
+                      <div key={txt.id} style={{ position: 'absolute', left: `${txt.x}%`, top: `${txt.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${txt.fontSize}px`, fontFamily: `"${txt.font}", sans-serif`, color: txt.color, fontWeight: 'bold', cursor: 'grab', textShadow: '1px 1px 4px rgba(0,0,0,0.7)', userSelect: 'none', whiteSpace: 'nowrap', outline: selectedOverlay?.type === 'texts' && selectedOverlay?.id === txt.id ? '2px solid #818cf8' : 'none', borderRadius: '4px' }}
+                        onMouseDown={(ev) => handlePointerDown(ev, 'texts', txt.id)}
+                        onTouchStart={(ev) => handlePointerDown(ev, 'texts', txt.id)}>
+                        {txt.text}
+                        <button onClick={(ev) => { ev.stopPropagation(); setLocalTexts(prev => prev.filter(t => t.id !== txt.id)); if (selectedOverlay?.id === txt.id) setSelectedOverlay(null); }} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-rose-600" style={{cursor:'pointer'}}>✕</button>
+                      </div>
+                    ))}
+                    {localStickers.map(stk => (
+                      <div key={stk.id} style={{ position: 'absolute', left: `${stk.x}%`, top: `${stk.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${stk.size}px`, cursor: 'grab', userSelect: 'none', outline: selectedOverlay?.type === 'stickers' && selectedOverlay?.id === stk.id ? '2px solid #818cf8' : 'none', borderRadius: '4px' }}
+                        onMouseDown={(ev) => handlePointerDown(ev, 'stickers', stk.id)}
+                        onTouchStart={(ev) => handlePointerDown(ev, 'stickers', stk.id)}>
+                        {stk.emoji}
+                        <button onClick={(ev) => { ev.stopPropagation(); setLocalStickers(prev => prev.filter(s => s.id !== stk.id)); if (selectedOverlay?.id === stk.id) setSelectedOverlay(null); }} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-rose-600" style={{cursor:'pointer'}}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Properties Panel */}
+                <div className="w-64 bg-slate-50 border-l border-slate-200 p-4 overflow-y-auto flex-shrink-0">
+                  <h3 className="text-sm font-bold text-slate-700 mb-3">Properties</h3>
+                  {selectedText && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">Text Content</label>
+                        <input type="text" value={selectedText.text} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, text: e.target.value } : t))} className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">Font</label>
+                        <select value={selectedText.font} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, font: e.target.value } : t))} className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg">
+                          {FONT_LIBRARY.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">Font Size: {selectedText.fontSize}px</label>
+                        <input type="range" min="12" max="120" value={selectedText.fontSize} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, fontSize: parseInt(e.target.value) } : t))} className="w-full accent-indigo-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">Color</label>
+                        <input type="color" value={selectedText.color} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, color: e.target.value } : t))} className="w-full h-8 rounded cursor-pointer" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 block mb-1">X: {selectedText.x}%</label>
+                          <input type="range" min="0" max="100" value={selectedText.x} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, x: parseInt(e.target.value) } : t))} className="w-full accent-indigo-600" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 block mb-1">Y: {selectedText.y}%</label>
+                          <input type="range" min="0" max="100" value={selectedText.y} onChange={e => setLocalTexts(prev => prev.map(t => t.id === selectedText.id ? { ...t, y: parseInt(e.target.value) } : t))} className="w-full accent-indigo-600" />
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                  {localStickers.map(stk => (
-                    <div key={stk.id} style={{ position: 'absolute', left: `${stk.x}%`, top: `${stk.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${stk.size}px`, cursor: 'grab', userSelect: 'none' }}
-                      onMouseDown={(ev) => handlePointerDown(ev, 'stickers', stk.id)}
-                      onTouchStart={(ev) => handlePointerDown(ev, 'stickers', stk.id)}>
-                      {stk.emoji}
-                      <button onClick={(ev) => { ev.stopPropagation(); setLocalStickers(prev => prev.filter(s => s.id !== stk.id)); }} className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] hover:bg-rose-600" style={{cursor:'pointer'}}>✕</button>
+                  )}
+                  {selectedSticker && (
+                    <div className="space-y-3">
+                      <div className="text-center text-4xl">{selectedSticker.emoji}</div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 block mb-1">Size: {selectedSticker.size}px</label>
+                        <input type="range" min="20" max="200" value={selectedSticker.size} onChange={e => setLocalStickers(prev => prev.map(s => s.id === selectedSticker.id ? { ...s, size: parseInt(e.target.value) } : s))} className="w-full accent-indigo-600" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 block mb-1">X: {selectedSticker.x}%</label>
+                          <input type="range" min="0" max="100" value={selectedSticker.x} onChange={e => setLocalStickers(prev => prev.map(s => s.id === selectedSticker.id ? { ...s, x: parseInt(e.target.value) } : s))} className="w-full accent-indigo-600" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-500 block mb-1">Y: {selectedSticker.y}%</label>
+                          <input type="range" min="0" max="100" value={selectedSticker.y} onChange={e => setLocalStickers(prev => prev.map(s => s.id === selectedSticker.id ? { ...s, y: parseInt(e.target.value) } : s))} className="w-full accent-indigo-600" />
+                        </div>
+                      </div>
                     </div>
-                  ))}
+                  )}
+                  {!selectedText && !selectedSticker && (
+                    <p className="text-xs text-slate-400 italic">Click on a text or sticker overlay to edit its properties.</p>
+                  )}
                 </div>
               </div>
-              <div className="p-4 flex justify-end gap-3 bg-slate-50 border-t border-slate-100">
+              <div className="p-4 flex justify-end gap-3 bg-slate-50 border-t border-slate-100 flex-shrink-0">
                 <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-200 transition-all">Cancel</button>
                 <button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow-md transition-all">Save & Close</button>
               </div>
@@ -1212,7 +1280,7 @@
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <SparklesIcon className="text-white w-8 h-8" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 mb-3">Welcome to SlideCaster</h1>
+              <h1 className="text-2xl font-bold text-slate-900 mb-3">Welcome to AI Reel & Video Maker by TooLabX</h1>
               <p className="text-slate-600 mb-6 text-sm leading-relaxed">
                 To use automatic slide script generation, please provide your Gemini API Key.
               </p>
