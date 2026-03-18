@@ -182,25 +182,25 @@
     function ReelMakerApp() {
       const MUSIC_LIBRARY = [
         { name: "None", url: "" },
-        { name: "Inspired (Uplifting)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Inspired.mp3" },
-        { name: "Wholesome (Feel Good)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wholesome.mp3" },
-        { name: "Carefree (Happy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3" },
-        { name: "Cipher2 (Tech)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cipher2.mp3" },
-        { name: "Hiding Your Reality (Dark)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hiding%20Your%20Reality.mp3" },
-        { name: "Merry Go (Playful)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3" },
-        { name: "Perspectives (Corporate)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Perspectives.mp3" },
-        { name: "Pixelland (Retro)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Pixelland.mp3" },
-        { name: "Vivacity (Energetic)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Vivacity.mp3" },
-        { name: "Airport Lounge (Calm)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3" },
-        { name: "Garden Music (Nature)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Garden%20Music.mp3" },
-        { name: "Backed Vibes (Chill)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3" },
-        { name: "Wish Background (Dreamy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wish%20Background.mp3" },
-        { name: "Sneaky Snitch (Fun)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3" },
-        { name: "Smooth Lovin (Jazz)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3" },
-        { name: "Elevator (Lo-Fi)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3" },
-        { name: "Gymnopedie No 1 (Piano)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3" },
-        { name: "Monkeys Spinning (Comedy)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3" },
-        { name: "Sugar Plum Fairy (Classic)", url: "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3" }
+        { name: "Inspired (Uplifting)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Inspired.mp3" },
+        { name: "Wholesome (Feel Good)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wholesome.mp3" },
+        { name: "Carefree (Happy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Carefree.mp3" },
+        { name: "Cipher2 (Tech)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Cipher2.mp3" },
+        { name: "Hiding Your Reality (Dark)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Hiding%20Your%20Reality.mp3" },
+        { name: "Merry Go (Playful)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3" },
+        { name: "Perspectives (Corporate)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Perspectives.mp3" },
+        { name: "Pixelland (Retro)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Pixelland.mp3" },
+        { name: "Vivacity (Energetic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Vivacity.mp3" },
+        { name: "Airport Lounge (Calm)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3" },
+        { name: "Garden Music (Nature)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Garden%20Music.mp3" },
+        { name: "Backed Vibes (Chill)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3" },
+        { name: "Wish Background (Dreamy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wish%20Background.mp3" },
+        { name: "Sneaky Snitch (Fun)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3" },
+        { name: "Smooth Lovin (Jazz)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3" },
+        { name: "Elevator (Lo-Fi)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3" },
+        { name: "Gymnopedie No 1 (Piano)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3" },
+        { name: "Monkeys Spinning (Comedy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3" },
+        { name: "Sugar Plum Fairy (Classic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3" }
       ];
       const STICKER_LIBRARY = ["😀", "😂", "🥰", "😎", "🎉", "✨", "🔥", "💡", "⭐", "❤️", "👍", "🚀", "👀", "💯", "⚠️"];
       const FONT_LIBRARY = ["Inter", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
@@ -963,7 +963,7 @@
           if (backgroundMusic) {
             try {
               setCompilationProgress("Loading background music...");
-              const res = await fetch(backgroundMusic, { mode: 'cors' });
+              const res = await fetch(backgroundMusic);
               if (!res.ok) throw new Error(`Music fetch failed: HTTP ${res.status}`);
               const ab = await res.arrayBuffer();
               const musicBuffer = await audioCtx.decodeAudioData(ab);

@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/music-proxy/:path*",
+      "destination": "https://incompetech.com/:path*"
+    }
+  ]
+}
