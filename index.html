@@ -252,6 +252,7 @@
           id: 1, 
           imageFile: null, 
           imagePreviewUrl: null, 
+          mediaType: "image",
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
@@ -435,6 +436,7 @@
           id: Date.now() + Math.random(), 
           imageFile: null, 
           imagePreviewUrl: null, 
+          mediaType: "image",
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
@@ -479,7 +481,7 @@
           const previewUrl = URL.createObjectURL(file);
           const slide = slides.find(s => s.id === id);
           if (slide && slide.imagePreviewUrl) URL.revokeObjectURL(slide.imagePreviewUrl);
-          updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl });
+          updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl, mediaType: file.type.startsWith('video/') ? 'video' : 'image' });
         }
       };
 
@@ -500,6 +502,7 @@
           id: Date.now() + index + Math.random(),
           imageFile: file,
           imagePreviewUrl: URL.createObjectURL(file),
+          mediaType: file.type.startsWith('video/') ? 'video' : 'image',
           script: "",
           audioBlob: null,
           audioUrl: null,
@@ -551,6 +554,30 @@
         return base64ToWav(part.data, rate);
       };
 
+      const getVideoFrameAsBase64 = (videoFile) => new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(videoFile);
+        const video = document.createElement('video');
+        video.src = url;
+        video.muted = true;
+        video.playsInline = true;
+        video.onloadeddata = () => {
+          video.currentTime = 0; // default to first frame
+        };
+        video.onseeked = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL('image/jpeg').split(',')[1]);
+          } catch(e) {
+            reject(e);
+          }
+        };
+        video.onerror = (e) => reject(new Error("Video load failed"));
+      });
+
       const autoGenerateScript = async (id) => {
         const currentlyGeneratingCount = slides.filter(s => s.isGeneratingScript).length;
         if (currentlyGeneratingCount >= 3) {
@@ -560,7 +587,7 @@
 
         const slide = slides.find(s => s.id === id);
         if (!slide || !slide.imageFile) {
-          alert("Please upload an image for this slide first.");
+          alert("Please upload an image or video for this slide first.");
           return;
         }
 
@@ -572,7 +599,8 @@
         updateSlide(id, { isGeneratingScript: true, scriptGenerationProgress: 'Analyzing Slide...' });
 
         try {
-          const base64Image = await fileToBase64(slide.imageFile);
+          const base64Image = slide.mediaType === 'video' ? await getVideoFrameAsBase64(slide.imageFile) : await fileToBase64(slide.imageFile);
+          const mimeType = slide.mediaType === 'video' ? 'image/jpeg' : slide.imageFile.type;
           setQuota(q => ({ ...q, used: q.used + 1, rpm: q.rpm + 1 }));
           
           // Use whichever model passed the startup diagnostic test
@@ -582,7 +610,7 @@
             contents: [{
               parts: [
                 { text: "Act as an expert educator. Look at this presentation slide and provide a concise, high-impact explanation for students. Your explanation should be clear and professional. Aim for a script about 3-5 sentences long that covers the key concept shown. Return only the script text." },
-                { inlineData: { mimeType: slide.imageFile.type, data: base64Image } }
+                { inlineData: { mimeType: mimeType, data: base64Image } }
               ]
             }]
           };
@@ -763,7 +791,11 @@
               <div className="flex flex-1 overflow-hidden">
                 <div className="flex-1 bg-slate-900 p-4 flex justify-center items-center overflow-auto">
                   <div ref={containerRef} className="relative inline-block select-none" style={{ maxHeight: '60vh' }}>
-                    <img src={slide.imagePreviewUrl} alt="Slide" className="max-h-[60vh] max-w-full rounded-lg" draggable={false} />
+                    {slide.mediaType === 'video' ? (
+                      <video src={slide.imagePreviewUrl} controls autoPlay loop muted className="max-h-[60vh] max-w-full rounded-lg" />
+                    ) : (
+                      <img src={slide.imagePreviewUrl} alt="Slide" className="max-h-[60vh] max-w-full rounded-lg" draggable={false} />
+                    )}
                     {localTexts.map(txt => (
                       <div key={txt.id} style={{ position: 'absolute', left: `${txt.x}%`, top: `${txt.y}%`, transform: 'translate(-50%, -50%)', fontSize: `${txt.fontSize}px`, fontFamily: `"${txt.font}", sans-serif`, color: txt.color, fontWeight: 'bold', cursor: 'grab', textShadow: '1px 1px 4px rgba(0,0,0,0.7)', userSelect: 'none', whiteSpace: 'nowrap', outline: selectedOverlay?.type === 'texts' && selectedOverlay?.id === txt.id ? '2px solid #818cf8' : 'none', borderRadius: '4px' }}
                         onMouseDown={(ev) => handlePointerDown(ev, 'texts', txt.id)}
@@ -870,6 +902,7 @@
                 voice: s.voice,
                 imageName: s.imageFile ? s.imageFile.name : null,
                 imageType: s.imageFile ? s.imageFile.type : null,
+                mediaType: s.mediaType || 'image',
                 base64
               };
             }))
@@ -917,6 +950,7 @@
               id: s.id || Date.now() + Math.random(),
               imageFile,
               imagePreviewUrl,
+              mediaType: s.mediaType || 'image',
               script: s.script || "",
               voice: s.voice || data.globalVoice || "Kore",
               audioBlob: null, audioUrl: null,
@@ -1126,7 +1160,13 @@
             const drawVisual = (visual, xOffset = 0, alpha = 1) => {
               if (!visual) return;
               ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-              if (visual.img) {
+              if (visual.video) {
+                const vid = visual.video;
+                const scale = Math.min(canvas.width / vid.videoWidth, canvas.height / vid.videoHeight);
+                const w = vid.videoWidth * scale;
+                const h = vid.videoHeight * scale;
+                ctx.drawImage(vid, xOffset + (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+              } else if (visual.img) {
                 const img = visual.img;
                 const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
                 const w = img.width * scale;
@@ -1216,43 +1256,71 @@
             const sentences = (slide.script ? slide.script.match(sentenceRegex) || [slide.script] : []);
 
             let slideImg = null;
+            let slideVideo = null;
             if (slide.imagePreviewUrl) {
-              slideImg = new Image();
-              slideImg.src = slide.imagePreviewUrl;
-              await new Promise(r => { slideImg.onload = r; slideImg.onerror = r; });
+              if (slide.mediaType === 'video') {
+                slideVideo = document.createElement('video');
+                slideVideo.src = slide.imagePreviewUrl;
+                slideVideo.muted = true;
+                slideVideo.playsInline = true;
+                slideVideo.crossOrigin = "anonymous";
+                slideVideo.loop = true;
+                await new Promise(r => {
+                  slideVideo.onloadedmetadata = () => r();
+                  slideVideo.onerror = r;
+                });
+                slideVideo.currentTime = 0;
+              } else {
+                slideImg = new Image();
+                slideImg.src = slide.imagePreviewUrl;
+                await new Promise(r => { slideImg.onload = r; slideImg.onerror = r; });
+              }
             }
 
             let audioDurationMs = 3000; 
             let audioBuffer = null;
+            let actualAudioDurMs = 0;
             if (slide.audioBlob) {
               try {
                 const arrayBuffer = await slide.audioBlob.arrayBuffer();
                 audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                audioDurationMs = audioBuffer.duration * 1000;
+                actualAudioDurMs = audioBuffer.duration * 1000;
+                audioDurationMs = actualAudioDurMs;
               } catch (e) {}
             } else if (slide.script) {
               audioDurationMs = Math.max(3000, slide.script.length * 70);
+              actualAudioDurMs = audioDurationMs;
+            }
+
+            if (slideVideo && slideVideo.duration) {
+              audioDurationMs = Math.max(audioDurationMs, slideVideo.duration * 1000);
             }
 
             previousSlideVisual = currentSlideVisual;
             if (previousSlideVisual) transitionStartTime = performance.now();
 
             currentSlideVisual = { 
-              img: slideImg, sentences, 
+              img: slideImg, video: slideVideo, sentences, 
               duration: audioDurationMs, nowAtStart: performance.now(),
               texts: slide.texts || [], stickers: slide.stickers || [],
               link: slide.link || ''
             };
+
+            if (slideVideo) {
+              const playPromise = slideVideo.play();
+              if (playPromise !== undefined) playPromise.catch(e => console.error(e));
+            }
 
             if (audioBuffer) {
                 const source = audioCtx.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(voiceGain);
                 source.start();
-                await new Promise(r => { source.onended = r; });
+                await new Promise(r => setTimeout(r, audioDurationMs));
             } else {
                 await new Promise(r => setTimeout(r, audioDurationMs));
             }
+            if (slideVideo) slideVideo.pause();
             
             // tiny buffer between slides
             await new Promise(r => setTimeout(r, 200));
@@ -1469,9 +1537,9 @@
                 <h3 className="font-semibold text-indigo-900 mb-1">How it works</h3>
                 <p className="text-sm text-indigo-800/80 mb-3">Upload images, add scripts and overlays, then compile your video or reel.</p>
                 <div className="flex flex-wrap gap-2">
-                  <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={handleBulkImageUpload} />
+                  <input type="file" multiple accept="image/*,video/*" className="hidden" ref={fileInputRef} onChange={handleBulkImageUpload} />
                   <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2">
-                    <PresentationIcon className="w-4 h-4" /> Bulk Upload Images
+                    <PresentationIcon className="w-4 h-4" /> Bulk Upload Media
                   </button>
                 </div>
               </div>
@@ -1487,7 +1555,7 @@
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2">
                           <label className="cursor-pointer bg-white text-slate-800 text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 hover:bg-slate-50 transition-all">
                             <UploadIcon className="w-4 h-4" /> Change
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
+                            <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                           </label>
                           <button onClick={() => setExpandedSlideId(slide.id)} className="bg-white text-slate-800 text-sm font-medium px-4 py-2 rounded-lg shadow flex items-center gap-2 hover:bg-slate-50 transition-all">
                             <SparklesIcon className="w-4 h-4" /> Edit Overlays
@@ -1497,8 +1565,8 @@
                     ) : (
                       <label className="cursor-pointer w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 transition-all">
                         <PresentationIcon className="w-8 h-8 mb-2 opacity-50" />
-                        <span className="text-sm font-medium text-center">Upload Image</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
+                        <span className="text-sm font-medium text-center">Upload Media</span>
+                        <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleImageUpload(slide.id, e)} />
                       </label>
                     )}
                     <div className="absolute top-3 left-3 bg-white/90 text-slate-700 text-xs font-bold px-2 py-1 rounded shadow-sm border border-slate-200/50">{index + 1}</div>
@@ -1589,7 +1657,7 @@
                 </div>
               ))}
               <button onClick={handleAddSlide} className="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 font-medium flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-indigo-400 hover:text-indigo-600 transition-all">
-                <PlusIcon className="w-5 h-5"/> Add Another Image
+                <PlusIcon className="w-5 h-5"/> Add Media
               </button>
             </div>
           </main>
@@ -1597,7 +1665,7 @@
           <footer className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-lg z-20">
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
               <div className="flex flex-col">
-                <div className="text-sm text-slate-500 font-medium">Total Images: <span className="text-slate-900">{slides.length}</span><span className="text-slate-400"> / 10</span></div>
+                <div className="text-sm text-slate-500 font-medium">Total Media: <span className="text-slate-900">{slides.length}</span><span className="text-slate-400"> / 10</span></div>
                 {!slides.every(s => s.audioUrl) && <div className="text-[10px] text-rose-500 font-semibold animate-pulse uppercase tracking-wider">Generate all voices to compile</div>}
               </div>
               <div className="flex flex-col items-end">
