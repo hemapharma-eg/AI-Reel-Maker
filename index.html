@@ -15,7 +15,10 @@
   <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
   
   <!-- Clerk Authentication SDK -->
-  <script async crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js" type="text/javascript"></script>
+  <script async crossorigin="anonymous" 
+          data-clerk-publishable-key="pk_test_cHJvYmFibGUtZG9uZXktNDAuY2xlcmsuYWNjb3VudHMuZGV2JA" 
+          src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js" 
+          type="text/javascript"></script>
   
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -1667,21 +1670,21 @@
           throw new Error("Clerk SDK failed to load from CDN.");
         }
 
-        const clerk = new window.Clerk('pk_test_cHJvYmFibGUtZG9uZXktNDAuY2xlcmsuYWNjb3VudHMuZGV2JA');
-        await clerk.load({
+        await window.Clerk.load({
+          proxyUrl: '/__clerk',
           appearance: {
             variables: { colorPrimary: '#4f46e5' }
           }
         });
 
-        if (clerk.user) {
+        if (window.Clerk.user) {
           // Render the main app
-          root.render(<AppErrorBoundary><ReelMakerApp clerk={clerk} /></AppErrorBoundary>);
+          root.render(<AppErrorBoundary><ReelMakerApp clerk={window.Clerk} /></AppErrorBoundary>);
           
           // Wait for render, then mount UserButton
           setTimeout(() => {
             const userButtonDiv = document.getElementById('user-button');
-            if (userButtonDiv) clerk.mountUserButton(userButtonDiv);
+            if (userButtonDiv) window.Clerk.mountUserButton(userButtonDiv);
           }, 100);
         } else {
           // Render full screen sign in
@@ -1699,7 +1702,7 @@
           );
           setTimeout(() => {
             const signInDiv = document.getElementById('sign-in');
-            if (signInDiv) clerk.mountSignIn(signInDiv);
+            if (signInDiv) window.Clerk.mountSignIn(signInDiv);
           }, 100);
         }
       } catch (err) {
