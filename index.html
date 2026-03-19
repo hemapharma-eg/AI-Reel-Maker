@@ -14,6 +14,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
   
+  <!-- Clerk Authentication SDK -->
+  <script async crossorigin="anonymous" 
+          data-clerk-publishable-key="pk_test_cHJvYmFibGUtZG9uZXktNDAuY2xlcmsuYWNjb3VudHMuZGV2JA" 
+          src="https://probable-doney-40.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js" 
+          type="text/javascript"></script>
+  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -1280,22 +1286,24 @@
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <SparklesIcon className="text-white w-8 h-8" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 mb-3">Welcome to AI Reel & Video Maker by TooLabX</h1>
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                Welcome{typeof Clerk !== 'undefined' && Clerk.user?.firstName ? `, ${Clerk.user.firstName}` : ''}!
+              </h1>
               <p className="text-slate-600 mb-6 text-sm leading-relaxed">
-                To use automatic slide script generation, please provide your Gemini API Key.
+                You are successfully signed in. To use automatic slide script generation, please provide your Gemini API Key.
               </p>
               <div className="mb-6 text-left bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-2">
-                  <PlayIcon className="w-4 h-4 text-indigo-600" /> First time setup (Completely Free):
+                  <PlayIcon className="w-4 h-4 text-indigo-600" /> Getting your Gemini API Key:
                 </h3>
                 <ol className="text-xs text-slate-600 space-y-2 ml-4 list-decimal leading-relaxed">
                   <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-600 font-bold hover:underline">Google AI Studio</a></li>
-                  <li>Click <strong>"Create API key"</strong> (new users may need to click "Create project" first)</li>
-                  <li>Copy the key and paste it below. <strong>(Done! You won't need to do this again)</strong></li>
+                  <li>Click <strong>"Create API key"</strong></li>
+                  <li>Copy the key and paste it below.</li>
                 </ol>
                 <div className="mt-3 p-2 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-2">
-                  <span className="text-rose-500 font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-rose-200 uppercase">Warning</span>
-                  <p className="text-[10px] text-rose-700 font-medium leading-tight">Your API key is private like a password. <strong>Do not share it with anyone.</strong></p>
+                  <span className="text-rose-500 font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-rose-200 uppercase">Privacy</span>
+                  <p className="text-[10px] text-rose-700 font-medium leading-tight">Your API key is stored locally in your browser and never sent to our servers.</p>
                 </div>
               </div>
 
@@ -1382,6 +1390,11 @@
                     <select value={transitionType} onChange={(e) => setTransitionType(e.target.value)} className="bg-transparent font-semibold text-indigo-700 outline-none">
                       {ANIMATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
+                  </div>
+                  
+                  {/* Clerk User Button Mount Point */}
+                  <div className="flex items-center ml-2 border-l border-slate-200 pl-4">
+                    <div id="user-button"></div>
                   </div>
                 </div>
               </div>
@@ -1643,7 +1656,46 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<AppErrorBoundary><ReelMakerApp /></AppErrorBoundary>);
+
+    window.addEventListener('load', async function () {
+      try {
+        await Clerk.load({
+          appearance: {
+            variables: { colorPrimary: '#4f46e5' }
+          }
+        });
+
+        if (Clerk.user) {
+          // Render the main app
+          root.render(<AppErrorBoundary><ReelMakerApp /></AppErrorBoundary>);
+          
+          // Wait for render, then mount UserButton
+          setTimeout(() => {
+            const userButtonDiv = document.getElementById('user-button');
+            if (userButtonDiv) Clerk.mountUserButton(userButtonDiv);
+          }, 100);
+        } else {
+          // Render full screen sign in
+          root.render(
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+              <div id="sign-in"></div>
+            </div>
+          );
+          setTimeout(() => {
+            const signInDiv = document.getElementById('sign-in');
+            if (signInDiv) Clerk.mountSignIn(signInDiv);
+          }, 100);
+        }
+      } catch (err) {
+        console.error("Clerk initialization failed:", err);
+        root.render(
+          <div className="p-10 bg-red-50 text-red-900 h-screen flex flex-col items-center justify-center text-center">
+            <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
+            <p>Failed to load authentication system. Please check your connection and refresh.</p>
+          </div>
+        );
+      }
+    });
   </script>
 </body>
 </html>
