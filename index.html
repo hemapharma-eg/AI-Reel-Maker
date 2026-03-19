@@ -1375,10 +1375,10 @@
           
           if (musicSourceRef) musicSourceRef.stop();
           
-          await stopRecordingAPI();
-          
           videoTrack.stop();
           audioTrack.stop();
+          
+          await stopRecordingAPI();
 
           let finalBlob = getFinalBlobAPI();
 
