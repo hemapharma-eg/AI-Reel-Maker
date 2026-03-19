@@ -1657,8 +1657,19 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
 
-    window.addEventListener('load', async function () {
+    const initClerk = async () => {
       try {
+        // Wait for Clerk SDK to load (Babel scripts run asynchronously)
+        let attempts = 0;
+        while (typeof Clerk === 'undefined' && attempts < 100) {
+          await new Promise(r => setTimeout(r, 50));
+          attempts++;
+        }
+        
+        if (typeof Clerk === 'undefined') {
+          throw new Error("Clerk SDK failed to load from CDN.");
+        }
+
         await Clerk.load({
           appearance: {
             variables: { colorPrimary: '#4f46e5' }
@@ -1677,7 +1688,14 @@
         } else {
           // Render full screen sign in
           root.render(
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-900">
+               <div className="mb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-200">
+                    <VideoIcon className="text-white w-8 h-8" />
+                 </div>
+                 <h1 className="text-3xl font-extrabold tracking-tight mb-2">Reel Maker</h1>
+                 <p className="text-slate-500 font-medium">Sign in to start creating AI-generated videos</p>
+               </div>
               <div id="sign-in"></div>
             </div>
           );
@@ -1692,10 +1710,13 @@
           <div className="p-10 bg-red-50 text-red-900 h-screen flex flex-col items-center justify-center text-center">
             <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
             <p>Failed to load authentication system. Please check your connection and refresh.</p>
+            <p className="text-sm mt-4 font-mono">{err.message}</p>
           </div>
         );
       }
-    });
+    };
+
+    initClerk();
   </script>
 </body>
 </html>
