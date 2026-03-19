@@ -3,10 +3,6 @@
     {
       "source": "/music-proxy/:path*",
       "destination": "https://incompetech.com/:path*"
-    },
-    {
-      "source": "/__clerk/:path*",
-      "destination": "https://probable-doney-40.clerk.accounts.dev/:path*"
     }
   ]
 }
