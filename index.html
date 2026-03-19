@@ -160,6 +160,17 @@
       reader.onerror = error => reject(error);
     });
 
+    const getVideoDuration = (file) => new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.src = url;
+      video.onloadedmetadata = () => {
+        resolve(video.duration);
+        URL.revokeObjectURL(url);
+      };
+      video.onerror = () => reject(new Error("Failed to get video duration"));
+    });
+
 
     function downloadWordTemplate() {
       const xmlHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -253,6 +264,7 @@
           imageFile: null, 
           imagePreviewUrl: null, 
           mediaType: "image",
+          videoDuration: 0,
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
@@ -436,6 +448,7 @@
           imageFile: null, 
           imagePreviewUrl: null, 
           mediaType: "image",
+          videoDuration: 0,
           script: "", 
           audioBlob: null, 
           audioUrl: null, 
@@ -472,18 +485,22 @@
         setSlides(prev => prev.map(s => s.id === slideId ? { ...s, [type]: (s[type] || []).filter(o => o.id !== overlayId) } : s));
       };
 
-      const handleImageUpload = (id, e) => {
+      const handleImageUpload = async (id, e) => {
         const files = e.target.files;
         if (files && files.length > 0) {
           const file = files[0];
           const previewUrl = URL.createObjectURL(file);
           const slide = slides.find(s => s.id === id);
           if (slide && slide.imagePreviewUrl) URL.revokeObjectURL(slide.imagePreviewUrl);
-          updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl, mediaType: file.type.startsWith('video/') ? 'video' : 'image' });
+          let videoDuration = 0;
+          if (file.type.startsWith('video/')) {
+             try { videoDuration = await getVideoDuration(file); } catch(err){}
+          }
+          updateSlide(id, { imageFile: file, imagePreviewUrl: previewUrl, mediaType: file.type.startsWith('video/') ? 'video' : 'image', videoDuration });
         }
       };
 
-      const handleBulkImageUpload = (e) => {
+      const handleBulkImageUpload = async (e) => {
         const files = e.target.files ? Array.from(e.target.files) : [];
         if (files.length === 0) return;
 
@@ -496,21 +513,30 @@
           return;
         }
 
-        const newSlides = files.map((file, index) => ({
-          id: Date.now() + index + Math.random(),
-          imageFile: file,
-          imagePreviewUrl: URL.createObjectURL(file),
-          mediaType: file.type.startsWith('video/') ? 'video' : 'image',
-          script: "",
-          audioBlob: null,
-          audioUrl: null,
-          isGenerating: false,
-          voice: globalVoice,
-          isGeneratingScript: false,
-          scriptGenerationProgress: "",
-          texts: [],
-          stickers: []
-        }));
+        const newSlidesPromises = files.map(async (file, index) => {
+          let videoDuration = 0;
+          if (file.type.startsWith('video/')) {
+             try { videoDuration = await getVideoDuration(file); } catch(err){}
+          }
+          return {
+            id: Date.now() + index + Math.random(),
+            imageFile: file,
+            imagePreviewUrl: URL.createObjectURL(file),
+            mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+            videoDuration,
+            script: "",
+            audioBlob: null,
+            audioUrl: null,
+            isGenerating: false,
+            voice: globalVoice,
+            isGeneratingScript: false,
+            scriptGenerationProgress: "",
+            texts: [],
+            stickers: []
+          };
+        });
+        
+        const newSlides = await Promise.all(newSlidesPromises);
 
         setSlides(prev => {
           if (prev.length === 1 && !prev[0].imageFile && !prev[0].script) {
@@ -600,13 +626,19 @@
           const mimeType = slide.mediaType === 'video' ? 'image/jpeg' : slide.imageFile.type;
           setQuota(q => ({ ...q, used: q.used + 1, rpm: q.rpm + 1 }));
           
+          let durationPrompt = "Aim for a script about 3-5 sentences long that covers the key concept shown.";
+          if (slide.mediaType === 'video' && slide.videoDuration > 0) {
+             const maxWords = Math.floor(slide.videoDuration * 2.5);
+             durationPrompt = `CRITICAL: Your response MUST be less than ${maxWords} words so it can be spoken in under ${Math.floor(slide.videoDuration)} seconds. Be extremely concise.`;
+          }
+
           // Use whichever model passed the startup diagnostic test
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${workingModel}:generateContent?`;
           console.log(`[SlideCaster] Script generation using model: ${workingModel}`);
           const payload = {
             contents: [{
               parts: [
-                { text: "Act as an expert educator. Look at this presentation slide and provide a concise, high-impact explanation for students. Your explanation should be clear and professional. Aim for a script about 3-5 sentences long that covers the key concept shown. Return only the script text." },
+                { text: `Act as an expert educator. Look at this presentation slide and provide a concise, high-impact explanation for students. Your explanation should be clear and professional. ${durationPrompt} Return only the script text.` },
                 { inlineData: { mimeType: mimeType, data: base64Image } }
               ]
             }]
@@ -900,6 +932,7 @@
                 imageName: s.imageFile ? s.imageFile.name : null,
                 imageType: s.imageFile ? s.imageFile.type : null,
                 mediaType: s.mediaType || 'image',
+                videoDuration: s.videoDuration || 0,
                 base64
               };
             }))
@@ -948,6 +981,7 @@
               imageFile,
               imagePreviewUrl,
               mediaType: s.mediaType || 'image',
+              videoDuration: s.videoDuration || 0,
               script: s.script || "",
               voice: s.voice || data.globalVoice || "Kore",
               audioBlob: null, audioUrl: null,
@@ -1560,7 +1594,23 @@
                         <button onClick={() => handleRemoveSlide(slide.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><TrashIcon className="w-4 h-4"/></button>
                       </div>
                     </div>
-                    <textarea value={slide.script} onChange={(e) => updateSlide(slide.id, { script: e.target.value })} className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400" placeholder="Type the script here..."/>
+                    <textarea 
+                      value={slide.script} 
+                      onChange={(e) => {
+                         const newVal = e.target.value;
+                         if (slide.mediaType === 'video' && slide.videoDuration > 0) {
+                            const maxChars = Math.floor((slide.videoDuration * 1000) / 70);
+                            if (newVal.length > maxChars) {
+                               alert(`This script exceeds the video duration (${slide.videoDuration.toFixed(1)}s). Maximum allowed characters: ${maxChars}.`);
+                               updateSlide(slide.id, { script: newVal.substring(0, maxChars) });
+                               return;
+                            }
+                         }
+                         updateSlide(slide.id, { script: newVal });
+                      }} 
+                      className="w-full flex-1 min-h-[100px] bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-400" 
+                      placeholder="Type the script here..."
+                    />
                     
                     <div className="mt-4 pt-4 border-t border-slate-100">
                       <div className="flex items-center justify-between mb-3">
