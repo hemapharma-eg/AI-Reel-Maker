@@ -185,6 +185,16 @@
       URL.revokeObjectURL(url);
     }
 
+    function UserButton() {
+      const mountRef = React.useRef(null);
+      React.useEffect(() => {
+        if (mountRef.current && window.Clerk) {
+          window.Clerk.mountUserButton(mountRef.current);
+        }
+      }, []);
+      return <div className="clerk-user-button-container" ref={mountRef}></div>;
+    }
+
     function ReelMakerApp() {
       const MUSIC_LIBRARY = [
         { name: "None", url: "" },
@@ -1392,9 +1402,9 @@
                     </select>
                   </div>
                   
-                  {/* Clerk User Button Mount Point */}
+                  {/* Clerk User Button */}
                   <div className="flex items-center ml-2 border-l border-slate-200 pl-4">
-                    <div id="user-button"></div>
+                    <UserButton />
                   </div>
                 </div>
               </div>
@@ -1679,12 +1689,6 @@
         if (window.Clerk.user) {
           // Render the main app
           root.render(<AppErrorBoundary><ReelMakerApp clerk={window.Clerk} /></AppErrorBoundary>);
-          
-          // Wait for render, then mount UserButton
-          setTimeout(() => {
-            const userButtonDiv = document.getElementById('user-button');
-            if (userButtonDiv) window.Clerk.mountUserButton(userButtonDiv);
-          }, 100);
         } else {
           // Render full screen sign in
           root.render(
