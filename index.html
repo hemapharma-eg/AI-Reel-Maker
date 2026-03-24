@@ -368,7 +368,7 @@
 
       useEffect(() => {
         if (isPlaying && isReadyToPlay) {
-          startBGM();
+          playBGM();
           const scene = scenes[currentScene];
           if (scene.audioUrl && audioRef.current) {
             audioRef.current.src = scene.audioUrl;
