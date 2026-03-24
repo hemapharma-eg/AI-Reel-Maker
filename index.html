@@ -587,9 +587,17 @@
         try {
           console.log('[ReelMaker] Using Pollinations.ai (free fallback)...');
           setMsg('Generating image via free AI service...');
-          // Shorten prompt to avoid URI Too Long errors (max ~1000 chars)
-          const shortPrompt = enhancedPrompt.substring(0, 800);
-          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          
+          // 1. Shorten prompt 
+          // 2. Strip ALL special characters (slashes, quotes, newlines) because 
+          // Pollinations URL path router throws 404 if it sees encoded slashes (%2F)
+          const shortPrompt = enhancedPrompt
+            .substring(0, 800)
+            .replace(/[^a-zA-Z0-9\s,.-]/g, ' ') // Only keep safe characters
+            .replace(/\s+/g, ' ') // Remove extra spaces
+            .trim();
+            
+          const pollinationsUrl = `https://pollinations.ai/p/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
           
           const res = await fetch(pollinationsUrl);
           if (res.ok) {
