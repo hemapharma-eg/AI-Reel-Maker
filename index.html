@@ -559,74 +559,52 @@
 
       const generateSceneImage = async (prompt) => {
         const enhancedPrompt = prompt + " -- cinematic lighting, highly detailed, photorealistic, 8k resolution, vertical composition";
-        const errors = [];
         
-        // --- Try multiple Imagen payload formats (the 400 means format is wrong) ---
-        const imagenAttempts = [
-          // Format 1: instances as array, with aspectRatio
-          { model: 'imagen-4.0-generate-001', endpoint: 'predict', 
-            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1, aspectRatio: "9:16" } } },
-          // Format 2: instances as single object (original user code format)
-          { model: 'imagen-4.0-generate-001', endpoint: 'predict',
-            payload: { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } } },
-          // Format 3: generateImages endpoint  
-          { model: 'imagen-4.0-generate-001', endpoint: 'generateImages',
-            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1 } } },
-          // Format 4: Imagen 3 as fallback
-          { model: 'imagen-3.0-generate-002', endpoint: 'predict',
-            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1 } } },
-        ];
-        
-        for (const attempt of imagenAttempts) {
-          try {
-            const res = await rmFetchWithRetry(
-              `https://generativelanguage.googleapis.com/v1beta/models/${attempt.model}:${attempt.endpoint}?key=${userApiKey}`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(attempt.payload) }
-            );
-            if (res.ok) {
-              const data = await res.json();
-              const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-              if (b64) {
-                console.log(`[ReelMaker] ✅ Image generated with ${attempt.model}:${attempt.endpoint}`);
-                return `data:image/png;base64,${b64}`;
-              }
+        // --- Try 1: Imagen 4.0 (paid plans only) ---
+        try {
+          const payload = { 
+            instances: [{ prompt: enhancedPrompt }], 
+            parameters: { sampleCount: 1, aspectRatio: "9:16" } 
+          };
+          const res = await rmFetchWithRetry(
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${userApiKey}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+            if (b64) {
+              console.log('[ReelMaker] ✅ Image generated with Imagen 4.0');
+              return `data:image/png;base64,${b64}`;
             }
-            if (res.status === 404) { errors.push(`${attempt.model}:${attempt.endpoint} → 404`); continue; }
-            const errBody = await res.text().catch(() => '');
-            errors.push(`${attempt.model}:${attempt.endpoint} → ${res.status}: ${errBody.substring(0, 150)}`);
-            console.warn(`[ReelMaker] ❌ ${attempt.model}:${attempt.endpoint} ${res.status}`, errBody.substring(0, 300));
-          } catch (e) { errors.push(`${attempt.model}: ${e.message}`); }
-        }
+          }
+          const errBody = await res.text().catch(() => '');
+          console.warn(`[ReelMaker] Imagen 4.0 unavailable (${res.status}), falling back to Pollinations.ai`, errBody.substring(0, 200));
+        } catch (e) { console.warn('[ReelMaker] Imagen error:', e.message); }
 
-        // --- Gemini Native Image Generation ---
-        const geminiImageModels = ['gemini-2.0-flash-exp', 'gemini-2.0-flash-preview-image-generation'];
-        for (const model of geminiImageModels) {
-          try {
-            const payload = {
-              contents: [{ parts: [{ text: `Generate a single high-quality image: ${enhancedPrompt}` }] }],
-              generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
-            };
-            const res = await rmFetchWithRetry(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${userApiKey}`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-            );
-            if (res.ok) {
-              const data = await res.json();
-              const parts = data.candidates?.[0]?.content?.parts || [];
-              const imgPart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
-              if (imgPart) {
-                console.log(`[ReelMaker] ✅ Image generated with ${model} (Gemini native)`);
-                return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
-              }
+        // --- Try 2: Pollinations.ai (FREE, no API key needed) ---
+        try {
+          console.log('[ReelMaker] Using Pollinations.ai (free fallback)...');
+          setMsg('Generating image via free AI service...');
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          
+          // Pollinations returns the image directly as a response
+          const res = await fetch(pollinationsUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            if (blob.size > 1000) { // Valid image
+              console.log('[ReelMaker] ✅ Image generated with Pollinations.ai');
+              return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+              });
             }
-            if (res.status === 404) { errors.push(`${model} → 404`); continue; }
-            const errBody = await res.text().catch(() => '');
-            errors.push(`${model} → ${res.status}: ${errBody.substring(0, 150)}`);
-            console.warn(`[ReelMaker] ❌ ${model}: ${res.status}`, errBody.substring(0, 300));
-          } catch (e) { errors.push(`${model}: ${e.message}`); }
-        }
+          }
+          console.warn('[ReelMaker] Pollinations.ai failed:', res.status);
+        } catch (e) { console.warn('[ReelMaker] Pollinations error:', e.message); }
 
-        throw new Error(`Image generation failed.\n\n${errors.join('\n')}\n\nCheck API key at https://aistudio.google.com/app/apikey`);
+        throw new Error("Image generation failed. Imagen requires a paid plan, and the free fallback (Pollinations.ai) was unavailable. Please try again or upgrade your API key at https://ai.dev/projects");
       };
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
