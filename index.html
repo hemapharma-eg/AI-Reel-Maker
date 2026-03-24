@@ -584,7 +584,7 @@
           ? "IMPORTANT: The script MUST be written in the Egyptian Arabic dialect. IN EGYPTIAN ARABIC."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly 5 consecutive scenes. For each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a JSON object: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}\nCreate exactly 5 consecutive scenes. For each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words. Avoid quotes inside it).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
