@@ -561,30 +561,41 @@
         const enhancedPrompt = prompt + " -- cinematic lighting, highly detailed, photorealistic, 8k resolution, vertical composition";
         const errors = [];
         
-        // --- Imagen Models (predict API) - try only the first one that's NOT 404 ---
-        const imagenModels = ['imagen-4.0-generate-001', 'imagen-3.0-generate-002'];
-        for (const model of imagenModels) {
+        // --- Try multiple Imagen payload formats (the 400 means format is wrong) ---
+        const imagenAttempts = [
+          // Format 1: instances as array, with aspectRatio
+          { model: 'imagen-4.0-generate-001', endpoint: 'predict', 
+            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1, aspectRatio: "9:16" } } },
+          // Format 2: instances as single object (original user code format)
+          { model: 'imagen-4.0-generate-001', endpoint: 'predict',
+            payload: { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } } },
+          // Format 3: generateImages endpoint  
+          { model: 'imagen-4.0-generate-001', endpoint: 'generateImages',
+            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1 } } },
+          // Format 4: Imagen 3 as fallback
+          { model: 'imagen-3.0-generate-002', endpoint: 'predict',
+            payload: { instances: [{ prompt: enhancedPrompt }], parameters: { sampleCount: 1 } } },
+        ];
+        
+        for (const attempt of imagenAttempts) {
           try {
-            const payload = { 
-              instances: [{ prompt: enhancedPrompt }], 
-              parameters: { sampleCount: 1, aspectRatio: "9:16" } 
-            };
             const res = await rmFetchWithRetry(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${userApiKey}`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+              `https://generativelanguage.googleapis.com/v1beta/models/${attempt.model}:${attempt.endpoint}?key=${userApiKey}`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(attempt.payload) }
             );
             if (res.ok) {
               const data = await res.json();
-              if (data.predictions?.[0]?.bytesBase64Encoded) {
-                console.log(`[ReelMaker] ✅ Image generated with ${model}`);
-                return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+              const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+              if (b64) {
+                console.log(`[ReelMaker] ✅ Image generated with ${attempt.model}:${attempt.endpoint}`);
+                return `data:image/png;base64,${b64}`;
               }
             }
-            if (res.status === 404) { errors.push(`${model}: not available`); continue; }
-            const errText = await res.text().catch(() => '');
-            errors.push(`${model}: HTTP ${res.status}`);
-            console.warn(`[ReelMaker] ❌ ${model}: HTTP ${res.status}`, errText.substring(0, 200));
-          } catch (e) { errors.push(`${model}: ${e.message}`); }
+            if (res.status === 404) { errors.push(`${attempt.model}:${attempt.endpoint} → 404`); continue; }
+            const errBody = await res.text().catch(() => '');
+            errors.push(`${attempt.model}:${attempt.endpoint} → ${res.status}: ${errBody.substring(0, 150)}`);
+            console.warn(`[ReelMaker] ❌ ${attempt.model}:${attempt.endpoint} ${res.status}`, errBody.substring(0, 300));
+          } catch (e) { errors.push(`${attempt.model}: ${e.message}`); }
         }
 
         // --- Gemini Native Image Generation ---
@@ -608,14 +619,14 @@
                 return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
               }
             }
-            if (res.status === 404) { errors.push(`${model}: not available`); continue; }
-            const errText = await res.text().catch(() => '');
-            errors.push(`${model}: HTTP ${res.status}`);
-            console.warn(`[ReelMaker] ❌ ${model}: HTTP ${res.status}`, errText.substring(0, 200));
+            if (res.status === 404) { errors.push(`${model} → 404`); continue; }
+            const errBody = await res.text().catch(() => '');
+            errors.push(`${model} → ${res.status}: ${errBody.substring(0, 150)}`);
+            console.warn(`[ReelMaker] ❌ ${model}: ${res.status}`, errBody.substring(0, 300));
           } catch (e) { errors.push(`${model}: ${e.message}`); }
         }
 
-        throw new Error(`Image generation failed. Errors:\n${errors.join('\n')}\n\nCheck API key at https://aistudio.google.com/app/apikey`);
+        throw new Error(`Image generation failed.\n\n${errors.join('\n')}\n\nCheck API key at https://aistudio.google.com/app/apikey`);
       };
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
