@@ -583,12 +583,14 @@
         } catch (e) { console.warn('[ReelMaker] Imagen error:', e.message); }
 
         // --- Try 2: Pollinations.ai (FREE, no API key needed) ---
+        let pollinationsError = "";
         try {
           console.log('[ReelMaker] Using Pollinations.ai (free fallback)...');
           setMsg('Generating image via free AI service...');
-          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          // Shorten prompt to avoid URI Too Long errors (max ~1000 chars)
+          const shortPrompt = enhancedPrompt.substring(0, 800);
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
           
-          // Pollinations returns the image directly as a response
           const res = await fetch(pollinationsUrl);
           if (res.ok) {
             const blob = await res.blob();
@@ -599,12 +601,19 @@
                 reader.onloadend = () => resolve(reader.result);
                 reader.readAsDataURL(blob);
               });
+            } else {
+              pollinationsError = `Blob too small (${blob.size} bytes)`;
             }
+          } else {
+            pollinationsError = `HTTP ${res.status} ${res.statusText}`;
           }
-          console.warn('[ReelMaker] Pollinations.ai failed:', res.status);
-        } catch (e) { console.warn('[ReelMaker] Pollinations error:', e.message); }
+          console.warn('[ReelMaker] Pollinations.ai failed:', pollinationsError);
+        } catch (e) { 
+          pollinationsError = e.message;
+          console.warn('[ReelMaker] Pollinations fetch error:', e.message); 
+        }
 
-        throw new Error("Image generation failed. Imagen requires a paid plan, and the free fallback (Pollinations.ai) was unavailable. Please try again or upgrade your API key at https://ai.dev/projects");
+        throw new Error(`Image generation failed.\nImagen 4.0: Requires paid plan.\nPollinations.ai (Free): ${pollinationsError}`);
       };
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
