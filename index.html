@@ -539,52 +539,56 @@
 
       const generateSceneImage = async (prompt) => {
         const enhancedPrompt = prompt + " -- cinematic lighting, highly detailed, photorealistic, 8k resolution, vertical composition";
+        const errors = [];
         
-        // Try 1: Imagen 4.0
-        try {
-          const payload1 = { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } };
-          const res1 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${userApiKey}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload1)
-          });
-          if (res1.ok) {
-            const data1 = await res1.json();
-            if (data1.predictions?.[0]?.bytesBase64Encoded) return `data:image/png;base64,${data1.predictions[0].bytesBase64Encoded}`;
-          }
-          console.warn("[ReelMaker] Imagen 4.0 failed, trying Imagen 3.0...");
-        } catch (e) { console.warn("[ReelMaker] Imagen 4.0 error:", e.message); }
+        // --- Imagen Models (predict API) ---
+        const imagenModels = ['imagen-4.0-generate-001', 'imagen-3.0-generate-002', 'imagen-3.0-generate-001'];
+        for (const model of imagenModels) {
+          try {
+            const payload = { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } };
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${userApiKey}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.predictions?.[0]?.bytesBase64Encoded) {
+                console.log(`[ReelMaker] ✅ Image generated with ${model}`);
+                return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+              }
+            }
+            const errText = await res.text().catch(() => '');
+            errors.push(`${model}: HTTP ${res.status}`);
+            console.warn(`[ReelMaker] ❌ ${model} failed: HTTP ${res.status}`, errText.substring(0, 200));
+          } catch (e) { errors.push(`${model}: ${e.message}`); console.warn(`[ReelMaker] ❌ ${model} error:`, e.message); }
+        }
 
-        // Try 2: Imagen 3.0
-        try {
-          const payload2 = { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } };
-          const res2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${userApiKey}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload2)
-          });
-          if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.predictions?.[0]?.bytesBase64Encoded) return `data:image/png;base64,${data2.predictions[0].bytesBase64Encoded}`;
-          }
-          console.warn("[ReelMaker] Imagen 3.0 failed, trying Gemini native image gen...");
-        } catch (e) { console.warn("[ReelMaker] Imagen 3.0 error:", e.message); }
+        // --- Gemini Native Image Generation (generateContent with IMAGE modality) ---
+        const geminiImageModels = ['gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp-image-generation', 'gemini-2.0-flash'];
+        for (const model of geminiImageModels) {
+          try {
+            const payload = {
+              contents: [{ parts: [{ text: `Generate a single high-quality image: ${enhancedPrompt}` }] }],
+              generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+            };
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${userApiKey}`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const parts = data.candidates?.[0]?.content?.parts || [];
+              const imgPart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+              if (imgPart) {
+                console.log(`[ReelMaker] ✅ Image generated with ${model} (Gemini native)`);
+                return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
+              }
+            }
+            const errText = await res.text().catch(() => '');
+            errors.push(`${model}: HTTP ${res.status}`);
+            console.warn(`[ReelMaker] ❌ ${model} failed: HTTP ${res.status}`, errText.substring(0, 200));
+          } catch (e) { errors.push(`${model}: ${e.message}`); console.warn(`[ReelMaker] ❌ ${model} error:`, e.message); }
+        }
 
-        // Try 3: Gemini native image generation (gemini-2.0-flash with IMAGE modality)
-        try {
-          const payload3 = {
-            contents: [{ parts: [{ text: `Generate an image: ${enhancedPrompt}` }] }],
-            generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
-          };
-          const res3 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${userApiKey}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload3)
-          });
-          if (res3.ok) {
-            const data3 = await res3.json();
-            const parts = data3.candidates?.[0]?.content?.parts || [];
-            const imgPart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
-            if (imgPart) return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
-          }
-          console.warn("[ReelMaker] Gemini image gen also failed.");
-        } catch (e) { console.warn("[ReelMaker] Gemini image gen error:", e.message); }
-
-        throw new Error("Image generation failed. All models (Imagen 4.0, Imagen 3.0, Gemini) were unavailable. Please check your API key permissions in Google AI Studio.");
+        throw new Error(`Image generation failed after trying ${errors.length} models. Errors:\n${errors.join('\n')}\n\nPlease check your API key permissions at https://aistudio.google.com/app/apikey`);
       };
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
