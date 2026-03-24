@@ -782,11 +782,17 @@
 
       const handleScriptEdit = (index, newText) => { const u = [...generatedScenes]; u[index].narration = newText; u[index].audioUrl = null; setGeneratedScenes(u); };
 
-      const regenerateSingleAudio = async (index) => {
-        const u = [...generatedScenes]; u[index].isGeneratingAudio = true; setGeneratedScenes([...u]);
-        try { const targetLang = getTargetLanguage(); const newAudioUrl = await generateSceneAudio(u[index].narration, selectedVoice, targetLang); u[index].audioUrl = newAudioUrl; }
-        catch (err) { console.error("Failed to regenerate audio", err); alert("Failed to generate audio."); }
-        finally { u[index].isGeneratingAudio = false; setGeneratedScenes([...u]); }
+      const regenerateSingleAudio = async (index, sceneNarration) => {
+        setGeneratedScenes(prev => { const u = [...prev]; u[index] = { ...u[index], isGeneratingAudio: true }; return u; });
+        try { 
+          const targetLang = getTargetLanguage(); 
+          const newAudioUrl = await generateSceneAudio(sceneNarration, selectedVoice, targetLang); 
+          setGeneratedScenes(prev => { const u = [...prev]; u[index] = { ...u[index], audioUrl: newAudioUrl, isGeneratingAudio: false }; return u; });
+        } catch (err) { 
+          console.error("Failed to regenerate audio", err); 
+          alert("Failed to generate audio."); 
+          setGeneratedScenes(prev => { const u = [...prev]; u[index] = { ...u[index], isGeneratingAudio: false }; return u; });
+        }
       };
 
       const handleSubmitYoutube = (e) => { e.preventDefault(); if (ytUrl.includes('youtube.com') || ytUrl.includes('youtu.be')) processCreation(ytUrl, 'youtube'); else alert('Please enter a valid YouTube URL'); };
@@ -1049,7 +1055,7 @@
                             <span className="text-xs text-rose-500 bg-rose-50 px-2 py-1 rounded flex items-center gap-1 border border-rose-100"><AlertCircleIcon size={12}/> Voice generation required</span>
                           )}
                           {!scene.audioUrl && (
-                            <button onClick={() => regenerateSingleAudio(idx)} disabled={scene.isGeneratingAudio}
+                            <button onClick={() => regenerateSingleAudio(idx, scene.narration)} disabled={scene.isGeneratingAudio}
                               className="text-xs bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 font-bold">
                               {scene.isGeneratingAudio ? <SparklesIcon size={14} className="animate-spin" /> : <Volume2Icon size={14} />} Regenerate Voice
                             </button>
