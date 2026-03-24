@@ -1475,7 +1475,7 @@
           return;
         }
 
-        if (aiStatus !== 'ready' || !userApiKey) {
+        if (aiStatus !== 'ready' || !getActiveKey()) {
           alert("AI was skipped or no API key provided. Please reload the app to enter your key.");
           return;
         }
@@ -1539,21 +1539,21 @@
           updateSlide(id, { audioBlob, audioUrl, isGenerating: false });
         } catch (error) {
           console.error("Audio generation failed:", error);
-          const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
+          const maskedKey = getActiveKey() ? `${getActiveKey().substring(0, 6)}...${getActiveKey().slice(-4)}` : "None";
           updateSlide(id, { isGenerating: false });
           alert(`Failed to generate audio (Key: ${maskedKey}). ${error.message}`);
         }
       };
 
       const changeApiKey = async () => {
-        const newKey = prompt("Enter your new Gemini API Key:", userApiKey);
+        const newKey = prompt("Enter your new Gemini API Key:", getActiveKey());
         if (newKey !== null && newKey.trim() !== "") {
           const result = await validateAndTestKey(newKey.trim());
           if (!result.ok) {
             alert(`❌ New key failed at "${result.step}":\n\n${result.error}`);
             return;
           }
-          setUserApiKey(newKey.trim());
+          setUserApiKeys(prev => ({...prev, key1: newKey.trim()}));
           setWorkingModel(result.useModel);
           // Reset all stale state (Cause #6)
           setQuota({ used: 0, limit: 1500, rpm: 0 });
@@ -2304,14 +2304,14 @@
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Gemini API Key</label>
                 <input 
                   type="password" 
-                  value={userApiKey}
-                  onChange={(e) => setUserApiKey(e.target.value)}
+                  value={userApiKeys.key1}
+                  onChange={(e) => setUserApiKeys(prev => ({...prev, key1: e.target.value}))}
                   placeholder="AIzaSy..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
               </div>
               <div className="flex flex-col gap-3">
-                <button onClick={startWithAI} disabled={!userApiKey.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-xl transition-all shadow-md">Save Key & Start</button>
+                <button onClick={startWithAI} disabled={!userApiKeys.key1 || !userApiKeys.key1.trim()} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-3 rounded-xl transition-all shadow-md">Save Key & Start</button>
               </div>
             </div>
           </div>
@@ -2370,7 +2370,7 @@
               <div className="mt-8 flex items-center justify-center gap-4">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
                   <span className="font-bold text-slate-400 uppercase tracking-wider">Key:</span>
-                  <span className="font-mono text-slate-600">{userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : 'None'}</span>
+                  <span className="font-mono text-slate-600">{getActiveKey() ? `${getActiveKey().substring(0, 6)}...${getActiveKey().slice(-4)}` : 'None'}</span>
                   <button onClick={changeApiKey} className="font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider ml-1 hover:underline">Change</button>
                 </div>
                 <div className="flex items-center ml-2 border-l border-slate-200 pl-4">
@@ -2385,7 +2385,8 @@
       // --- REEL MAKER VIEW ---
       if (view === 'reelMaker') {
         return <ReelMakerToolView 
-          userApiKey={userApiKey} 
+          getActiveKey={getActiveKey} 
+          rotateKey={rotateKey}
           workingModel={workingModel} 
           safeGeminiFetch={safeGeminiFetch}
           onBack={() => setView('toolSelect')}
@@ -2473,11 +2474,12 @@
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key:</span>
-                    <span className="text-xs font-mono text-slate-600">
-                      {userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : 'None'}
-                    </span>
+                  <div className="flex flex-col items-start px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-0.5">Active API Key</span>
+                    <div className="flex items-center gap-2 font-mono text-sm text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 border border-emerald-600"></span>
+                      {getActiveKey() ? `${getActiveKey().substring(0, 6)}...${getActiveKey().slice(-4)}` : 'None'}
+                    </div>
                     <button onClick={changeApiKey} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider ml-1 hover:underline">Change</button>
                   </div>
                   <div className="relative">
