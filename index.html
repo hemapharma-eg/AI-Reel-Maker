@@ -104,13 +104,47 @@
     const XIcon = getSafeIcon('X');
     const CheckIcon = getSafeIcon('Check');
 
-    const VOICES = [
+    const COMMON_VOICES = [
       "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", 
       "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel", "Algieba", 
       "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", 
       "Alnilam", "Schedar", "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", 
       "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat"
     ];
+
+    const GLOBAL_VOICE_OPTIONS = [
+      { id: 'Aoede', name: 'Arabic Female 1 (Calm)', lang: 'ar' },
+      { id: 'Kore', name: 'Arabic Female 2 (Strong)', lang: 'ar' },
+      { id: 'Fenrir', name: 'Arabic Male 1 (Deep)', lang: 'ar' },
+      { id: 'Charon', name: 'Arabic Male 2 (Engaging)', lang: 'ar' },
+      ...COMMON_VOICES.map(v => ({ id: v, name: `${v} (English)`, lang: 'en' }))
+    ];
+
+    const MUSIC_LIBRARY = [
+      { name: "None", url: "" },
+      { name: "Inspired (Uplifting)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Inspired.mp3" },
+      { name: "Wholesome (Feel Good)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wholesome.mp3" },
+      { name: "Carefree (Happy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Carefree.mp3" },
+      { name: "Cipher2 (Tech)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Cipher2.mp3" },
+      { name: "Hiding Your Reality (Dark)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Hiding%20Your%20Reality.mp3" },
+      { name: "Merry Go (Playful)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3" },
+      { name: "Perspectives (Corporate)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Perspectives.mp3" },
+      { name: "Pixelland (Retro)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Pixelland.mp3" },
+      { name: "Vivacity (Energetic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Vivacity.mp3" },
+      { name: "Airport Lounge (Calm)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3" },
+      { name: "Garden Music (Nature)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Garden%20Music.mp3" },
+      { name: "Backed Vibes (Chill)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3" },
+      { name: "Wish Background (Dreamy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wish%20Background.mp3" },
+      { name: "Sneaky Snitch (Fun)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3" },
+      { name: "Smooth Lovin (Jazz)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3" },
+      { name: "Elevator (Lo-Fi)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3" },
+      { name: "Gymnopedie No 1 (Piano)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3" },
+      { name: "Monkeys Spinning (Comedy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3" },
+      { name: "Sugar Plum Fairy (Classic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3" }
+    ];
+    const STICKER_LIBRARY = ["😀", "😂", "🥰", "😎", "🎉", "✨", "🔥", "💡", "⭐", "❤️", "👍", "🚀", "👀", "💯", "⚠️"];
+    const FONT_LIBRARY = ["Inter", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
+    const ANIMATION_TYPES = ["none", "fade", "slide-left"];
 
     // Utility: Convert raw PCM Base64 to WAV Blob
     function base64ToWav(base64, sampleRate = 24000) {
@@ -279,33 +313,56 @@
       });
     };
 
-    const RMRecreatedPlayer = ({ scenes, selectedBgmId, bgmVolume, targetLang }) => {
+    const RMRecreatedPlayer = ({ scenes, selectedBgmId, bgmVolume, voiceVolume, targetLang }) => {
       const [currentScene, setCurrentScene] = useState(0);
       const [isPlaying, setIsPlaying] = useState(false);
       const [isExporting, setIsExporting] = useState(false);
       const [exportedVideoUrl, setExportedVideoUrl] = useState(null);
       const audioRef = useRef(null);
-      const bgAudioCtxRef = useRef(null);
-      const gainNodeRef = useRef(null);
-      const activeBgm = BGM_PRESETS.find(p => p.id === selectedBgmId) || BGM_PRESETS[0];
-
-      const startBGM = () => {
-        if (!bgAudioCtxRef.current) {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          bgAudioCtxRef.current = ctx;
-          const osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator(), gain = ctx.createGain();
-          gainNodeRef.current = gain;
-          osc1.type = activeBgm.o1; osc2.type = activeBgm.o2;
-          osc1.frequency.value = activeBgm.f1; osc2.frequency.value = activeBgm.f2;
-          gain.gain.value = activeBgm.gain * (bgmVolume / 100);
-          osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
-          osc1.start(); osc2.start();
-        } else if (bgAudioCtxRef.current.state === 'suspended') { bgAudioCtxRef.current.resume(); }
+      const bgAudioRef = useRef(null);
+      
+      const playBGM = () => {
+        if (!bgAudioRef.current) {
+          bgAudioRef.current = new Audio(selectedBgmId);
+          bgAudioRef.current.loop = true;
+          bgAudioRef.current.volume = bgmVolume / 100;
+          bgAudioRef.current.play().catch(e => console.log("BGM play failed", e));
+        } else if (bgAudioRef.current.paused) {
+          bgAudioRef.current.play().catch(e => console.log("BGM play failed", e));
+        }
       };
-      const stopBGM = () => { if (bgAudioCtxRef.current && bgAudioCtxRef.current.state === 'running') bgAudioCtxRef.current.suspend(); };
+      
+      const stopBGM = () => {
+        if (bgAudioRef.current && !bgAudioRef.current.paused) {
+          bgAudioRef.current.pause();
+        }
+      };
 
-      useEffect(() => { if (gainNodeRef.current) gainNodeRef.current.gain.value = activeBgm.gain * (bgmVolume / 100); }, [bgmVolume, activeBgm]);
-      useEffect(() => { return () => { if (bgAudioCtxRef.current) bgAudioCtxRef.current.close(); }; }, []);
+      useEffect(() => { 
+        if (bgAudioRef.current) bgAudioRef.current.volume = bgmVolume / 100; 
+      }, [bgmVolume]);
+
+      useEffect(() => { 
+        if (bgAudioRef.current) {
+          const wasPlaying = !bgAudioRef.current.paused;
+          bgAudioRef.current.src = selectedBgmId;
+          bgAudioRef.current.load();
+          if (wasPlaying) bgAudioRef.current.play().catch(e => console.log(e));
+        }
+      }, [selectedBgmId]);
+
+      useEffect(() => { 
+        return () => { 
+          if (bgAudioRef.current) {
+            bgAudioRef.current.pause();
+            bgAudioRef.current = null;
+          }
+        }; 
+      }, []);
+
+      useEffect(() => {
+        if (audioRef.current) audioRef.current.volume = voiceVolume / 100;
+      }, [voiceVolume]);
 
       const isReadyToPlay = scenes.every(s => s.audioUrl);
 
@@ -353,13 +410,15 @@
           const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 8000000 });
           const chunks = [];
           recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-          recorder.start(100);
-          const osc1 = audioCtx.createOscillator(), osc2 = audioCtx.createOscillator(), bgGain = audioCtx.createGain();
-          osc1.type = activeBgm.o1; osc2.type = activeBgm.o2;
-          osc1.frequency.value = activeBgm.f1; osc2.frequency.value = activeBgm.f2;
-          bgGain.gain.value = activeBgm.gain * (bgmVolume / 100);
-          osc1.connect(bgGain); osc2.connect(bgGain); bgGain.connect(dest);
-          osc1.start(); osc2.start();
+          const bgAudio = new Audio(selectedBgmId);
+          bgAudio.crossOrigin = "anonymous";
+          bgAudio.loop = true;
+          const bgSource = audioCtx.createMediaElementSource(bgAudio);
+          const bgGain = audioCtx.createGain();
+          bgGain.gain.value = bgmVolume / 100;
+          bgSource.connect(bgGain);
+          bgGain.connect(dest);
+          bgAudio.play().catch(e => console.warn("BGM Export play failed:", e));
           const particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 4 + 1, speed: Math.random() * 3 + 1, opacity: Math.random() * 0.4 + 0.1 }));
           for (const scene of scenes) {
             const img = new Image(); img.crossOrigin = 'anonymous';
@@ -367,7 +426,11 @@
             let isScenePlaying = true; let source;
             if (scene.audioUrl) {
               const audio = new Audio(scene.audioUrl); audio.crossOrigin = "anonymous";
-              source = audioCtx.createMediaElementSource(audio); source.connect(dest);
+              source = audioCtx.createMediaElementSource(audio);
+              const voiceGain = audioCtx.createGain();
+              voiceGain.gain.value = voiceVolume / 100;
+              source.connect(voiceGain);
+              voiceGain.connect(dest);
               audio.onended = () => { isScenePlaying = false; }; audio.onerror = () => { isScenePlaying = false; };
               await audio.play().catch(() => { isScenePlaying = false; });
             } else { setTimeout(() => { isScenePlaying = false; }, 4000); }
@@ -407,7 +470,7 @@
             }
             if (source) source.disconnect();
           }
-          osc1.stop(); osc2.stop();
+          bgAudio.pause();
           await new Promise(r => setTimeout(r, 300));
           recorder.stop();
           await new Promise(r => recorder.onstop = r);
@@ -467,9 +530,6 @@
           </button>
           {exportedVideoUrl && !isExporting && (
             <div className="mt-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
-              <p className="text-emerald-700 font-bold mb-2 flex items-center justify-center gap-2"><CheckCircle2Icon size={18} /> Video Exported Successfully!</p>
-              <p className="text-sm text-slate-600 mb-4" style={{ fontFamily: "'Tajawal', sans-serif" }}>If the download didn't start automatically, click below.</p>
-              <a href={exportedVideoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition-colors shadow-lg"><PlayIcon size={18} /> Open & Save Video</a>
             </div>
           )}
         </div>
@@ -477,7 +537,7 @@
     };
 
     // --- REEL MAKER TOOL VIEW ---
-    function ReelMakerToolView({ userApiKey, workingModel, safeGeminiFetch, onBack, changeApiKey }) {
+    function ReelMakerToolView({ getActiveKey, rotateKey, workingModel, safeGeminiFetch, onBack, changeApiKey }) {
       const [status, setStatus] = useState('idle');
       const [msg, setMsg] = useState('');
       const [generatedScenes, setGeneratedScenes] = useState([]);
@@ -486,11 +546,19 @@
       const [ytUrl, setYtUrl] = useState('');
       const [promptText, setPromptText] = useState('');
       const [selectedVoice, setSelectedVoice] = useState('Aoede');
-      const [selectedBgm, setSelectedBgm] = useState(BGM_PRESETS[0].id);
-      const [bgmVolume, setBgmVolume] = useState(100);
+      const [selectedBgm, setSelectedBgm] = useState(MUSIC_LIBRARY[0].url);
+      const [bgmVolume, setBgmVolume] = useState(20);
+      const [voiceVolume, setVoiceVolume] = useState(100);
+      
+      const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+      const [previewAudio, setPreviewAudio] = useState(null);
+      const [isPreviewingMusic, setIsPreviewingMusic] = useState(false);
+      const [musicAudio, setMusicAudio] = useState(null);
 
       const AlertCircleIcon = getSafeIcon('AlertCircle') || getSafeIcon('X');
       const Volume2Icon = getSafeIcon('Volume2') || getSafeIcon('Mic');
+      const PlayIcon = getSafeIcon('Play') || getSafeIcon('Check');
+      const PauseIcon = getSafeIcon('Pause') || getSafeIcon('X');
       const MusicIcon = getSafeIcon('Music') || getSafeIcon('Mic');
       const SlidersIcon = getSafeIcon('Sliders') || getSafeIcon('Settings');
       const SaveIcon = getSafeIcon('Save') || getSafeIcon('Download');
@@ -503,30 +571,13 @@
       const ImageIcon = getSafeIcon('Image') || getSafeIcon('Video');
       const CheckCircle2Icon = getSafeIcon('CheckCircle2') || getSafeIcon('Check');
 
-      const voiceOptions = [
-        { id: 'Aoede', name: 'Arabic Female 1 (Calm)', lang: 'ar' },
-        { id: 'Kore', name: 'Arabic Female 2 (Strong)', lang: 'ar' },
-        { id: 'Fenrir', name: 'Arabic Male 1 (Deep)', lang: 'ar' },
-        { id: 'Charon', name: 'Arabic Male 2 (Engaging)', lang: 'ar' },
-        { id: 'Puck', name: 'English Male 1 (Energetic)', lang: 'en' },
-        { id: 'Zephyr', name: 'English Male 2 (Smooth)', lang: 'en' },
-        { id: 'Orus', name: 'English Male 3 (Authoritative)', lang: 'en' },
-        { id: 'Iapetus', name: 'English Male 4 (Deep)', lang: 'en' },
-        { id: 'Enceladus', name: 'English Male 5 (Friendly)', lang: 'en' },
-        { id: 'Leda', name: 'English Female 1 (Clear)', lang: 'en' },
-        { id: 'Autonoe', name: 'English Female 2 (Warm)', lang: 'en' },
-        { id: 'Umbriel', name: 'English Female 3 (Soft)', lang: 'en' },
-        { id: 'Algieba', name: 'English Female 4 (Professional)', lang: 'en' },
-        { id: 'Despina', name: 'English Female 5 (Bright)', lang: 'en' }
-      ];
-
       useEffect(() => {
         const link = document.createElement('link');
         link.href = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;900&display=swap';
         link.rel = 'stylesheet'; document.head.appendChild(link);
       }, []);
 
-      const getTargetLanguage = () => { const voice = voiceOptions.find(v => v.id === selectedVoice); return voice ? voice.lang : 'en'; };
+      const getTargetLanguage = () => { const voice = GLOBAL_VOICE_OPTIONS.find(v => v.id === selectedVoice); return voice ? voice.lang : 'en'; };
 
       const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en') => {
         const langInstruction = lang === 'ar'
@@ -553,11 +604,18 @@
       };
 
       // Helper: wait with rate-limit-aware retry
-      const rmFetchWithRetry = async (url, options, maxRetries = 3) => {
+      const rmFetchWithRetry = async (urlBase, options, maxRetries = 3) => {
         let delay = 15000;
+        let currentKey = getActiveKey();
+        
         for (let i = 0; i < maxRetries; i++) {
-          const res = await fetch(url, options);
+          const res = await fetch(`${urlBase}?key=${currentKey}`, options);
           if (res.status === 429) {
+            const newKey = rotateKey();
+            if (newKey !== currentKey) {
+               currentKey = newKey;
+               continue; // Try instantly with the new key!
+            }
             const body = await res.text().catch(() => '');
             const waitMatch = body.match(/retry in ([\d.]+)s/i);
             const waitTime = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) * 1000 + 2000 : delay;
@@ -582,7 +640,7 @@
             parameters: { sampleCount: 1, aspectRatio: "9:16" } 
           };
           const res = await rmFetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${userApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
           );
           if (res.ok) {
@@ -601,7 +659,7 @@
         let pollinationsError = "";
         try {
           console.log('[ReelMaker] Using Pollinations.ai (free fallback)...');
-          setMsg('Generating image via free AI service...');
+          setMsg('Generating image via free AI service...'); setMsg('Generating image via free AI service...');
           
           // 1. Shorten prompt 
           // 2. Strip ALL special characters (slashes, quotes, newlines) because 
@@ -664,7 +722,7 @@
           const speechInstruction = lang === 'ar' ? `Say in an Egyptian Arabic accent: ${text}` : `Say in a natural, engaging tone: ${text}`;
           const payload = { contents: [{ parts: [{ text: speechInstruction }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } };
           const response = await rmFetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${userApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
           );
           if (!response.ok) return null;
@@ -761,6 +819,50 @@
 
       const targetLang = getTargetLanguage();
 
+      // PREVIEW HANDLERS
+      const handlePreviewVoice = async () => {
+        if (isPreviewingVoice || previewAudio) {
+           if (previewAudio) { previewAudio.pause(); setPreviewAudio(null); }
+           setIsPreviewingVoice(false);
+           return;
+        }
+        setIsPreviewingVoice(true);
+        try {
+          const lang = getTargetLanguage();
+          const text = lang === 'ar' ? 'مرحبًا، أنا متحمس جدًا للعمل معك' : 'Hello, I am super excited to work with you on this.';
+          const url = await generateSceneAudio(text, selectedVoice, lang);
+          if (url) {
+            const a = new Audio(url);
+            a.volume = voiceVolume / 100;
+            a.onended = () => { setIsPreviewingVoice(false); setPreviewAudio(null); };
+            a.onerror = () => { setIsPreviewingVoice(false); setPreviewAudio(null); };
+            a.play().catch(() => setIsPreviewingVoice(false));
+            setPreviewAudio(a);
+          } else setIsPreviewingVoice(false);
+        } catch(e) { setIsPreviewingVoice(false); }
+      };
+
+      const togglePreviewMusic = () => {
+        if (isPreviewingMusic || musicAudio) {
+           if (musicAudio) { musicAudio.pause(); setMusicAudio(null); }
+           setIsPreviewingMusic(false);
+        } else {
+           const a = new Audio(selectedBgm);
+           a.volume = bgmVolume / 100;
+           a.loop = true;
+           a.play().catch(() => setIsPreviewingMusic(false));
+           setMusicAudio(a);
+           setIsPreviewingMusic(true);
+        }
+      };
+      
+      useEffect(() => {
+         return () => {
+            if (previewAudio) previewAudio.pause();
+            if (musicAudio) musicAudio.pause();
+         }
+      }, [previewAudio, musicAudio]);
+
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
           <header className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -798,15 +900,56 @@
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500">Recreate</span> any video <br/>using pure AI.
                   </h1>
                   <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden mt-8 shadow-xl">
-                    <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between px-6">
-                      <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                        <Volume2Icon size={16} className="text-violet-500" /> Select Voiceover & Language:
-                      </label>
-                      <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}
-                        className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg focus:ring-violet-500 focus:border-violet-500 block p-2.5 outline-none">
-                        <optgroup label="Arabic Voices">{voiceOptions.filter(v => v.lang === 'ar').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</optgroup>
-                        <optgroup label="English Voices">{voiceOptions.filter(v => v.lang === 'en').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}</optgroup>
-                      </select>
+                    <div className="bg-slate-50 p-4 border-b border-slate-200 flex flex-col gap-4">
+                      <div className="flex flex-col md:flex-row gap-4 items-center px-2">
+                        <div className="flex-1 w-full flex items-center justify-between">
+                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
+                            <Volume2Icon size={16} className="text-violet-500" /> Voiceover:
+                          </label>
+                          <div className="w-1/2 flex gap-2">
+                            <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}
+                              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
+                              <optgroup label="Arabic">
+                                {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'ar').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                              </optgroup>
+                              <optgroup label="English">
+                                {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'en').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                              </optgroup>
+                            </select>
+                            <button onClick={handlePreviewVoice} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-violet-100 text-violet-600 hover:bg-violet-200 transition-colors hidden md:flex" disabled={isPreviewingVoice && !previewAudio} title="Preview Voice">
+                               {isPreviewingVoice ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 w-full flex items-center justify-between">
+                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
+                            <SlidersIcon size={16} className="text-violet-500" /> Voice Vol:
+                          </label>
+                          <input type="range" min="0" max="100" value={voiceVolume} onChange={(e) => setVoiceVolume(Number(e.target.value))} className="w-1/2 accent-violet-500 cursor-pointer" />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col md:flex-row gap-4 items-center px-2 pt-2 border-t border-slate-200">
+                        <div className="flex-1 w-full flex items-center justify-between">
+                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
+                            <MusicIcon size={16} className="text-emerald-500" /> Music:
+                          </label>
+                          <div className="w-1/2 flex gap-2">
+                            <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
+                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.title}</option>)}
+                            </select>
+                            <button onClick={togglePreviewMusic} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors hidden md:flex" title="Preview Music Track">
+                               {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex-1 w-full flex items-center justify-between">
+                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
+                            <SlidersIcon size={16} className="text-emerald-500" /> Music Vol:
+                          </label>
+                          <input type="range" min="0" max="100" value={bgmVolume} onChange={(e) => setBgmVolume(Number(e.target.value))} className="w-1/2 accent-emerald-500 cursor-pointer" />
+                        </div>
+                      </div>
                     </div>
                     <div className="flex border-b border-slate-200">
                       <button onClick={() => setInputMode('upload')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'upload' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><UploadCloudIcon size={18} /> Upload Video</button>
@@ -815,7 +958,7 @@
                       <button onClick={() => setInputMode('load')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'load' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><FolderOpenIcon size={18} /> Load Project</button>
                     </div>
                     <div className="p-8">
-                      {inputMode === 'upload' && (
+                       {inputMode === 'upload' && (
                         <label className="block cursor-pointer group">
                           <input type="file" accept="video/*" onChange={(e) => processCreation(e.target.files[0], 'upload')} className="hidden" />
                           <div className="border-2 border-dashed border-slate-300 hover:border-violet-400 rounded-2xl p-12 transition-all flex flex-col items-center gap-4 group-hover:bg-violet-50">
@@ -922,14 +1065,23 @@
                       <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2 border-b border-slate-200 pb-2"><SlidersIcon size={16} className="text-violet-500"/> Sound & Music Settings</h3>
                       <div className="space-y-4">
                         <div className="flex items-center justify-between gap-4">
-                          <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><MusicIcon size={14}/> Track</label>
-                          <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 w-2/3 outline-none">
-                            {BGM_PRESETS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                          </select>
+                          <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><Volume2Icon size={14}/> Voice Vol</label>
+                          <input type="range" min="0" max="100" value={voiceVolume} onChange={(e) => setVoiceVolume(Number(e.target.value))} className="w-2/3 accent-violet-500 cursor-pointer" />
                         </div>
                         <div className="flex items-center justify-between gap-4">
-                          <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><Volume2Icon size={14}/> Volume</label>
-                          <input type="range" min="0" max="100" value={bgmVolume} onChange={(e) => setBgmVolume(Number(e.target.value))} className="w-2/3 accent-violet-500 cursor-pointer" />
+                          <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><MusicIcon size={14}/> Track</label>
+                          <div className="w-2/3 flex gap-2">
+                            <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
+                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.title}</option>)}
+                            </select>
+                            <button onClick={togglePreviewMusic} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors" title="Preview Music Track">
+                               {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><Volume2Icon size={14}/> Music Vol</label>
+                          <input type="range" min="0" max="100" value={bgmVolume} onChange={(e) => setBgmVolume(Number(e.target.value))} className="w-2/3 accent-emerald-500 cursor-pointer" />
                         </div>
                       </div>
                     </div>
@@ -938,7 +1090,7 @@
                         <AlertCircleIcon size={18} /> Please regenerate audio for modified scenes to play.
                       </div>
                     )}
-                    <RMRecreatedPlayer scenes={generatedScenes} selectedBgmId={selectedBgm} bgmVolume={bgmVolume} targetLang={targetLang} />
+                    <RMRecreatedPlayer scenes={generatedScenes} selectedBgmId={selectedBgm} bgmVolume={bgmVolume} voiceVolume={voiceVolume} targetLang={targetLang} />
                   </div>
                 </div>
               </div>
@@ -950,32 +1102,6 @@
 
 
     function ReelMakerApp() {
-      const MUSIC_LIBRARY = [
-        { name: "None", url: "" },
-        { name: "Inspired (Uplifting)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Inspired.mp3" },
-        { name: "Wholesome (Feel Good)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wholesome.mp3" },
-        { name: "Carefree (Happy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Carefree.mp3" },
-        { name: "Cipher2 (Tech)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Cipher2.mp3" },
-        { name: "Hiding Your Reality (Dark)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Hiding%20Your%20Reality.mp3" },
-        { name: "Merry Go (Playful)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3" },
-        { name: "Perspectives (Corporate)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Perspectives.mp3" },
-        { name: "Pixelland (Retro)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Pixelland.mp3" },
-        { name: "Vivacity (Energetic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Vivacity.mp3" },
-        { name: "Airport Lounge (Calm)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3" },
-        { name: "Garden Music (Nature)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Garden%20Music.mp3" },
-        { name: "Backed Vibes (Chill)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3" },
-        { name: "Wish Background (Dreamy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Wish%20Background.mp3" },
-        { name: "Sneaky Snitch (Fun)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3" },
-        { name: "Smooth Lovin (Jazz)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3" },
-        { name: "Elevator (Lo-Fi)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3" },
-        { name: "Gymnopedie No 1 (Piano)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Gymnopedie%20No%201.mp3" },
-        { name: "Monkeys Spinning (Comedy)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3" },
-        { name: "Sugar Plum Fairy (Classic)", url: "/music-proxy/music/royalty-free/mp3-royaltyfree/Dance%20of%20the%20Sugar%20Plum%20Fairy.mp3" }
-      ];
-      const STICKER_LIBRARY = ["😀", "😂", "🥰", "😎", "🎉", "✨", "🔥", "💡", "⭐", "❤️", "👍", "🚀", "👀", "💯", "⚠️"];
-      const FONT_LIBRARY = ["Inter", "Arial", "Times New Roman", "Courier New", "Georgia", "Verdana"];
-      const ANIMATION_TYPES = ["none", "fade", "slide-left"];
-
       const [view, setView] = useState('home'); // 'home', 'toolSelect', 'app', or 'reelMaker'
       const [layout, setLayout] = useState('16:9'); // '16:9' or '9:16'
       const [backgroundMusic, setBackgroundMusic] = useState('');
@@ -983,7 +1109,7 @@
       const [voiceVolume, setVoiceVolume] = useState(1.0);
       const [transitionType, setTransitionType] = useState('none');
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
-      const [userApiKey, setUserApiKey] = useState('');
+      const [userApiKeys, setUserApiKeys] = useState({ key1: '', key2: '', key3: '' });
       const [globalVoice, setGlobalVoice] = useState("Kore");
       const [projectName, setProjectName] = useState("Untitled Project");
       const [activeAudio, setActiveAudio] = useState({ id: null, audio: null, isPlaying: false });
@@ -1027,14 +1153,30 @@
 
       const fileInputRef = useRef(null);
 
-      // --- Professional API Layer with Full Diagnostics ---
+      // --- Professional API Layer with Full Diagnostics & Round-Robin ---
+      const activeKeyRef = useRef(1);
+      const getActiveKey = () => userApiKeys[`key${activeKeyRef.current}`]?.trim() || userApiKeys.key1?.trim() || "";
+      const getValidKeysCount = () => Object.values(userApiKeys).filter(k => k.trim()).length;
+      const rotateKey = () => {
+         let nextIdx = activeKeyRef.current + 1;
+         if (nextIdx > 3) nextIdx = 1;
+         if (!userApiKeys[`key${nextIdx}`]?.trim()) nextIdx = 1; 
+         if (nextIdx !== activeKeyRef.current) {
+            console.log(`[Rate Limit] Rotating API key to slot ${nextIdx}`);
+            activeKeyRef.current = nextIdx;
+         }
+         return getActiveKey();
+      };
+
       const safeGeminiFetch = async (url, payload, maxRetries = 4) => {
         let delay = 3000;
-        const maskedKey = userApiKey ? `${userApiKey.substring(0, 6)}...${userApiKey.slice(-4)}` : "None";
-        const fullUrl = url + `key=${userApiKey}`;
-        console.log(`[SlideCaster API] Request to: ${url}key=${maskedKey}`);
-
+        let currentKey = getActiveKey();
+        
         for (let i = 0; i < maxRetries; i++) {
+          const maskedKey = currentKey ? `${currentKey.substring(0, 6)}...${currentKey.slice(-4)}` : "None";
+          const fullUrl = url + `key=${currentKey}`;
+          console.log(`[SlideCaster API] Request to: ${url}key=${maskedKey} (Slot ${activeKeyRef.current})`);
+          
           try {
             const res = await fetch(fullUrl, {
               method: 'POST',
@@ -1055,6 +1197,15 @@
               const apiMessage = parsedError?.error?.message || errorBody.substring(0, 300);
               
               if (res.status === 429) {
+                // Instantly try rotating key before waiting
+                if (getValidKeysCount() > 1) {
+                   const newKey = rotateKey();
+                   if (newKey !== currentKey) {
+                      currentKey = newKey;
+                      continue; // Immediately loop and try with new key!
+                   }
+                }
+                
                 if (i === maxRetries - 1) {
                   throw new Error(`Rate limit (429). Google says: "${apiMessage}"`);
                 }
@@ -1083,7 +1234,6 @@
       const validateAndTestKey = async (key) => {
         const maskedKey = key ? `${key.substring(0, 6)}...${key.slice(-4)}` : "None";
         
-        // Step 1: List models and find which ones support generateContent
         console.log(`[SlideCaster] Step 1: Listing available models for key ${maskedKey}...`);
         let availableModels = [];
         try {
@@ -1096,87 +1246,55 @@
             return { ok: false, step: 'Key Check', error: `HTTP ${listRes.status}: ${body.substring(0, 200)}` };
           }
           const listData = await listRes.json();
-          
-          // Filter for models that support generateContent
-          availableModels = (listData.models || [])
-            .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-            .map(m => m.name.replace('models/', ''));
-          
-          console.log('[SlideCaster] Models supporting generateContent:', availableModels.join(', '));
+          availableModels = (listData.models || []).filter(m => m.supportedGenerationMethods?.includes('generateContent')).map(m => m.name.replace('models/', ''));
         } catch (e) {
           return { ok: false, step: 'Key Check', error: e.message };
         }
 
-        if (availableModels.length === 0) {
-          return { ok: false, step: 'Model Discovery', error: 'No models found that support generateContent. Your API key may not have access to any Gemini models.' };
-        }
+        if (availableModels.length === 0) return { ok: false, step: 'Model Discovery', error: 'No models found that support generateContent.' };
 
-        // Step 2: Prefer these models in order, but only try ones that are actually available
         const preferred = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro'];
-        const modelsToTry = [
-          ...preferred.filter(p => availableModels.includes(p)),
-          ...availableModels.filter(m => !preferred.includes(m) && m.includes('flash'))
-        ];
-
-        // Deduplicate
-        const uniqueModels = [...new Set(modelsToTry)];
-        console.log(`[SlideCaster] Step 2: Will test ${uniqueModels.length} models: ${uniqueModels.join(', ')}`);
+        const modelsToTry = [...new Set([...preferred.filter(p => availableModels.includes(p)), ...availableModels.filter(m => !preferred.includes(m) && m.includes('flash'))])];
         
         let lastError = '';
-        for (const model of uniqueModels) {
-          console.log(`[SlideCaster] Testing ${model}...`);
+        for (const model of modelsToTry) {
           try {
             const testRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache, no-store',
-                'Pragma': 'no-cache'
-              },
+              headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
               cache: 'no-store',
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: "Say OK" }] }]
-              })
+              body: JSON.stringify({ contents: [{ parts: [{ text: "Say OK" }] }] })
             });
-            
-            if (testRes.ok) {
-              console.log(`[SlideCaster] ✅ ${model} works!`);
-              return { ok: true, useModel: model };
-            }
-            
+            if (testRes.ok) return { ok: true, useModel: model };
             const body = await testRes.text().catch(() => '');
             lastError = `${model} → HTTP ${testRes.status}: ${body.substring(0, 200)}`;
-            console.warn(`[SlideCaster] ❌ ${lastError}`);
           } catch (e) {
             lastError = `${model} → ${e.message}`;
-            console.warn(`[SlideCaster] ❌ ${lastError}`);
           }
         }
-        
-        return { ok: false, step: 'API Test', error: `All ${uniqueModels.length} available models failed.\n\nModels tried: ${uniqueModels.join(', ')}\n\nLast error: ${lastError}` };
+        return { ok: false, step: 'API Test', error: `All models failed. Last error: ${lastError}` };
       };
 
-
-      // Store which model works for this session
       const [workingModel, setWorkingModel] = useState('gemini-2.0-flash');
 
       const startWithAI = async () => {
-        if (!userApiKey.trim()) {
-          alert("Please enter a valid Gemini API Key.");
+        const primaryKey = userApiKeys.key1?.trim();
+        if (!primaryKey) {
+          alert("Please enter a valid Primary Gemini API Key.");
           return;
         }
         
-        const result = await validateAndTestKey(userApiKey.trim());
+        const result = await validateAndTestKey(primaryKey);
         if (!result.ok) {
-          alert(`❌ API Test Failed at "${result.step}":\n\n${result.error}\n\nThis means the issue is with your API key or Google project, not the app. Please verify your key in Google AI Studio.`);
+          alert(`❌ API Test Failed on Primary Key:\n\n${result.error}`);
           return;
         }
         
         console.log(`[SlideCaster] Using model: ${result.useModel}`);
         setWorkingModel(result.useModel);
-        // Reset all quota state for fresh start (Cause #6)
         setQuota({ used: 0, limit: 1500, rpm: 0 });
         setRefillTime(null);
+        activeKeyRef.current = 1;
         setAiStatus('ready');
         setView('toolSelect');
       };
