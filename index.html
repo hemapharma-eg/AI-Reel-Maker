@@ -621,7 +621,24 @@
           console.warn('[ReelMaker] Pollinations fetch error:', e.message); 
         }
 
-        throw new Error(`Image generation failed.\nImagen 4.0: Requires paid plan.\nPollinations.ai (Free): ${pollinationsError}`);
+        // --- Try 3: 100% Reliable Placeholder Fallback ---
+        // If adblockers/network block AI generators, guarantee a visual so the app doesn't crash
+        try {
+          console.log('[ReelMaker] AI models failed/blocked. Using fast placeholder image...');
+          setMsg('Network blocked AI images. Using placeholder...');
+          const placeholderUrl = `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/720/1280?blur=1`;
+          const res = await fetch(placeholderUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch(e) { console.warn('[ReelMaker] Placeholder failed:', e.message); }
+
+        throw new Error(`Image generation blocked. Please disable Adblockers/Brave Shields. \n\nErrors:\nImagen 4.0: Requires paid plan.\nPollinations: ${pollinationsError}`);
       };
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
