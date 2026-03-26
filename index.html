@@ -1109,14 +1109,25 @@
 
 
     function ReelMakerApp() {
-      const [view, setView] = useState('home'); // 'home', 'toolSelect', 'app', or 'reelMaker'
+      const [view, setView] = useState(() => {
+        try {
+          const saved = localStorage.getItem('reeLabX_apiKeys');
+          if (saved) { const k = JSON.parse(saved); if (k.key1?.trim()) return 'home_autostart'; }
+        } catch(e) {}
+        return 'home';
+      }); // 'home', 'home_autostart', 'toolSelect', 'app', or 'reelMaker'
       const [layout, setLayout] = useState('16:9'); // '16:9' or '9:16'
       const [backgroundMusic, setBackgroundMusic] = useState('');
       const [musicVolume, setMusicVolume] = useState(0.2);
       const [voiceVolume, setVoiceVolume] = useState(1.0);
       const [transitionType, setTransitionType] = useState('none');
       const [aiStatus, setAiStatus] = useState('idle'); // 'idle', 'ready', 'skipped'
-      const [userApiKeys, setUserApiKeys] = useState({ key1: '', key2: '', key3: '' });
+      const [userApiKeys, setUserApiKeys] = useState(() => {
+        try {
+          const saved = localStorage.getItem('reeLabX_apiKeys');
+          return saved ? JSON.parse(saved) : { key1: '', key2: '', key3: '' };
+        } catch(e) { return { key1: '', key2: '', key3: '' }; }
+      });
       const [globalVoice, setGlobalVoice] = useState("Kore");
       const [projectName, setProjectName] = useState("Untitled Project");
       const [activeAudio, setActiveAudio] = useState({ id: null, audio: null, isPlaying: false });
@@ -1125,6 +1136,11 @@
       const [refillTime, setRefillTime] = useState(null);
       const [musicPreviewAudio, setMusicPreviewAudio] = useState(null);
       const [expandedSlideId, setExpandedSlideId] = useState(null);
+
+      // Persist API keys to localStorage
+      useEffect(() => {
+        try { localStorage.setItem('reeLabX_apiKeys', JSON.stringify(userApiKeys)); } catch(e) {}
+      }, [userApiKeys]);
 
       useEffect(() => {
         const interval = setInterval(() => {
@@ -2263,6 +2279,39 @@
         }
       };
 
+      // Auto-validate saved key on mount (runs once)
+      const autoValidatedRef = useRef(false);
+      useEffect(() => {
+        if (view === 'home_autostart' && !autoValidatedRef.current) {
+          autoValidatedRef.current = true;
+          const key = userApiKeys.key1?.trim();
+          if (key) {
+            validateAndTestKey(key).then(result => {
+              if (result.ok) {
+                setWorkingModel(result.useModel);
+                setAiStatus('ready');
+                setView('toolSelect');
+              } else {
+                setView('home');
+              }
+            }).catch(() => setView('home'));
+          } else {
+            setView('home');
+          }
+        }
+      }, [view]);
+
+      if (view === 'home_autostart') {
+        return (
+          <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto"></div>
+              <p className="text-slate-600 font-medium">Validating saved API key...</p>
+            </div>
+          </div>
+        );
+      }
+
       if (view === 'home') {
         return (
           <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800">
@@ -2288,22 +2337,6 @@
                 <div className="mt-3 p-2 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-2">
                   <span className="text-rose-500 font-bold text-[10px] bg-white px-1.5 py-0.5 rounded border border-rose-200 uppercase">Privacy</span>
                   <p className="text-[10px] text-rose-700 font-medium leading-tight">Your API key is stored locally in your browser and never sent to our servers.</p>
-                </div>
-              </div>
-
-              <div className="mb-6 text-left">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Video Layout Mode</label>
-                <div className="flex gap-4">
-                  <label className={`flex-1 cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center gap-2 transition-all ${layout === '16:9' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
-                    <input type="radio" name="layout" value="16:9" checked={layout === '16:9'} onChange={(e) => setLayout(e.target.value)} className="hidden" />
-                    <div className="w-16 h-9 bg-slate-200 rounded border border-slate-300 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-500">16:9</span></div>
-                    <span className="text-sm font-semibold text-slate-700">Landscape wide</span>
-                  </label>
-                  <label className={`flex-1 cursor-pointer border-2 rounded-xl p-4 flex flex-col items-center gap-2 transition-all ${layout === '9:16' ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
-                    <input type="radio" name="layout" value="9:16" checked={layout === '9:16'} onChange={(e) => setLayout(e.target.value)} className="hidden" />
-                    <div className="w-9 h-16 bg-slate-200 rounded border border-slate-300 flex items-center justify-center"><span className="text-[10px] font-bold text-slate-500">9:16</span></div>
-                    <span className="text-sm font-semibold text-slate-700">Vertical Reel</span>
-                  </label>
                 </div>
               </div>
 
@@ -2455,6 +2488,14 @@
                       {ANIMATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
+
+                  <div className="flex items-center gap-3 text-sm bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <span className="text-slate-600 font-medium">Layout:</span>
+                    <select value={layout} onChange={(e) => setLayout(e.target.value)} className="bg-transparent font-semibold text-indigo-700 outline-none">
+                      <option value="16:9">16:9 Wide</option>
+                      <option value="9:16">9:16 Reel</option>
+                    </select>
+                  </div>
                   
                   {/* Clerk User Button */}
                   <div className="flex items-center ml-2 border-l border-slate-200 pl-4">
@@ -2471,7 +2512,7 @@
                     setGlobalVoice(e.target.value);
                     setSlides(slides.map(s => ({ ...s, voice: e.target.value })));
                   }} className="bg-transparent font-semibold text-indigo-700 outline-none">
-                    {VOICES.map(v => <option key={v} value={v}>{v}</option>)}
+                    {COMMON_VOICES.map(v => <option key={v} value={v}>{v}</option>)}
                   </select>
                   <div className="w-px h-4 bg-slate-300 mx-1"></div>
                   <button onClick={previewGlobalVoice} disabled={isPreviewingVoice} className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold transition-colors disabled:opacity-50">
