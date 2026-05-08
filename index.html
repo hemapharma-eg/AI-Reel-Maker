@@ -715,8 +715,8 @@
       };
 
       const generateSceneImage = async (prompt, searchQuery = "landscape") => {
-        const orientation = aspectRatio === '16:9' ? 'horizontal' : 'vertical';
-        const enhancedPrompt = prompt + ` -- cinematic lighting, highly detailed, photorealistic, 8k resolution, ${orientation} composition`;
+        const orientationDesc = aspectRatio === '16:9' ? 'wide horizontal' : 'tall vertical';
+        const enhancedPrompt = `Cinematic, highly detailed photorealistic shot: ${prompt}. Professional lighting, 8k resolution, ${orientationDesc} composition, masterpiece.`;
         
         // --- Try 1: Google Imagen 3.0 (Part of Gemini Pro / AI Studio) ---
         try {
@@ -724,7 +724,8 @@
             instances: [{ prompt: enhancedPrompt }], 
             parameters: { 
               sampleCount: 1, 
-              aspectRatio: aspectRatio === '16:9' ? "16:9" : "9:16" 
+              aspectRatio: aspectRatio === '16:9' ? "16:9" : "9:16",
+              safetySetting: "off"
             } 
           };
           const res = await rmFetchWithRetry(
@@ -735,12 +736,12 @@
             const data = await res.json();
             const b64 = data.predictions?.[0]?.bytesBase64Encoded;
             if (b64) {
-              console.log('[ReelMaker] ✅ Image generated with Imagen 3.0');
+              console.log('[ReelMaker] ✅ Premium image generated with Google Imagen 3.0');
               return `data:image/png;base64,${b64}`;
             }
           }
           const errBody = await res.text().catch(() => '');
-          console.warn(`[ReelMaker] Imagen 3.0 unavailable (${res.status}), falling back to Pollinations.ai`, errBody.substring(0, 200));
+          console.warn(`[ReelMaker] Imagen 3.0 failed or filtered (${res.status}). Fallback to Pollinations.`, errBody.substring(0, 250));
         } catch (e) { console.warn('[ReelMaker] Imagen error:', e.message); }
 
         // --- Try 2: Pollinations.ai (FREE, no API key needed) ---
