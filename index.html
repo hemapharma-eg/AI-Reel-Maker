@@ -883,28 +883,32 @@
           // Optional safety defaults in case Gemini omits them
           scenes = scenes.map(s => ({...s, animType: Math.random() > 0.5 ? 'panLeft' : 'panRight', search_query: s.search_query || "landscape" }));
 
-          setStatus('generating');
-          const finalScenes = [];
-          for (let i = 0; i < scenes.length; i++) {
-            setGenerationProgress(((i) / scenes.length) * 100);
-            
-            // SKIP Image Generation as per user request
-            const imageUrl = null; 
-            
-            setMsg(`Generating Voice (${i + 1}/${scenes.length})...`);
-            const audioUrl = await generateSceneAudio(scenes[i].narration, selectedVoice, targetLang);
-            
-            finalScenes.push({ ...scenes[i], imageUrl, audioUrl, isGeneratingAudio: false, isGeneratingImage: false });
-            
-            // Small delay between audio generations to avoid rate limits
-            if (i < scenes.length - 1) {
-              setMsg(`Cooling down...`);
-              await new Promise(r => setTimeout(r, 4000));
-            }
-          }
-          setGeneratedScenes(finalScenes);
           setStatus('complete');
-        } catch (err) { console.error(err); setStatus('error'); setMsg(err.message || "Failed to recreate video."); }
+          setGeneratedScenes(scenes.map(s => ({ ...s, imageUrl: null, audioUrl: null, isGeneratingAudio: false, isGeneratingImage: false })));
+        } catch (err) { console.error(err); setStatus('error'); setMsg(err.message || "Failed to analyze content."); }
+      };
+
+      const generateAllVoiceovers = async () => {
+        const scenes = [...generatedScenes];
+        setStatus('generating');
+        const targetLang = getTargetLanguage();
+        
+        for (let i = 0; i < scenes.length; i++) {
+          if (scenes[i].audioUrl) continue;
+          
+          setMsg(`Generating Voice (${i + 1}/${scenes.length})...`);
+          setGenerationProgress(((i) / scenes.length) * 100);
+          
+          const audioUrl = await generateSceneAudio(scenes[i].narration, selectedVoice, targetLang);
+          scenes[i] = { ...scenes[i], audioUrl };
+          setGeneratedScenes([...scenes]);
+          
+          if (i < scenes.length - 1) {
+            setMsg(`Cooling down...`);
+            await new Promise(r => setTimeout(r, 4000));
+          }
+        }
+        setStatus('complete');
       };
 
       const handleScriptEdit = (index, newText) => { const u = [...generatedScenes]; u[index].narration = newText; u[index].audioUrl = null; setGeneratedScenes(u); };
@@ -1188,10 +1192,15 @@
                 <div className="w-full md:w-[420px] bg-white rounded-3xl border border-slate-200 p-6 flex flex-col overflow-y-auto shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900"><SparklesIcon className="text-violet-500" /> Storyboard</h2>
-                    <label className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
-                      <UploadCloudIcon size={14} /> Bulk Images
-                      <input type="file" multiple accept="image/*" onChange={(e) => handleBulkImageUpload(e.target.files)} className="hidden" />
-                    </label>
+                    <div className="flex gap-2">
+                      <button onClick={generateAllVoiceovers} disabled={generatedScenes.every(s => s.audioUrl)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50">
+                        <MicIcon size={14} /> Generate Voices
+                      </button>
+                      <label className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
+                        <UploadCloudIcon size={14} /> Bulk Images
+                        <input type="file" multiple accept="image/*" onChange={(e) => handleBulkImageUpload(e.target.files)} className="hidden" />
+                      </label>
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {generatedScenes.map((scene, idx) => (
