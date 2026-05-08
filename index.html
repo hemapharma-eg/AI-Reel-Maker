@@ -61,15 +61,27 @@
         Video: (props) => (
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
         ),
-        Play: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        ),
-        Mic: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-        ),
-        Plus: (props) => (
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        )
+        Play: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="5 3 19 12 5 21 5 3"/></svg>),
+        Pause: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>),
+        Mic: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>),
+        Plus: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>),
+        Settings: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>),
+        Volume2: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>),
+        Music: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>),
+        Sliders: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="4" x2="20" y1="21" y2="14"/><line x1="4" x2="20" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="8" x2="16" y1="14" y2="14"/><line x1="8" x2="16" y1="8" y2="8"/></svg>),
+        Edit3: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>),
+        Link: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>),
+        UploadCloud: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/><polyline points="16 16 12 12 8 16"/></svg>),
+        Presentation: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg>),
+        FolderOpen: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>),
+        Save: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>),
+        Layers: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>),
+        Wand2: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>),
+        Image: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>),
+        CheckCircle2: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>),
+        Trash2: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>),
+        Loader2: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>),
+        AlertCircle: (props) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>),
       };
 
       if (fallbacks[name]) return fallbacks[name];
@@ -84,9 +96,7 @@
           if (key.toLowerCase() === lowerName && (typeof Lib[key] === 'function' || typeof Lib[key] === 'object')) return Lib[key]; 
         }
       }
-      return (props) => (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-      );
+      return fallbacks['AlertCircle'];
     };
 
     const PlayIcon = getSafeIcon('Play');
@@ -1045,73 +1055,79 @@
                   <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500">Recreate</span> any video <br/>using pure AI.
                   </h1>
-                  <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden mt-8 shadow-xl">
-                    <div className="bg-slate-50 p-4 border-b border-slate-200 flex flex-col gap-4">
-                      <div className="flex flex-col md:flex-row gap-4 items-center px-2">
-                        <div className="flex-1 w-full flex items-center justify-between">
-                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                            <Volume2Icon size={16} className="text-violet-500" /> Settings:
-                          </label>
-                          <div className="w-2/3 flex gap-2">
-                            <select value={aspectRatio} onChange={(e) => {
-                               setAspectRatio(e.target.value);
-                               if (e.target.value === '16:9') { window.exportW = 1280; window.exportH = 720; }
-                               else { window.exportW = 720; window.exportH = 1280; }
-                            }} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                               <option value="9:16">Reel (9:16)</option>
-                               <option value="16:9">Video (16:9)</option>
-                            </select>
-                            <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}
-                              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                              <optgroup label="Arabic">
-                                {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'ar').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                              </optgroup>
-                              <optgroup label="English">
-                                {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'en').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                              </optgroup>
-                            </select>
-                            <select value={visualEffect} onChange={(e) => setVisualEffect(e.target.value)}
-                              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                              <option value="none">No Effect</option>
-                              <option value="snow">Snow</option>
-                              <option value="rain">Rain</option>
-                              <option value="confetti">Confetti</option>
-                              <option value="stars">Stars</option>
-                            </select>
-                            <button onClick={handlePreviewVoice} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-violet-100 text-violet-600 hover:bg-violet-200 transition-colors hidden md:flex" disabled={isPreviewingVoice && !previewAudio} title="Preview Voice">
-                               {isPreviewingVoice ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
-                            </button>
+                  <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden mt-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                    <div className="bg-gradient-to-b from-slate-50 to-white p-6 border-b border-slate-200">
+                      
+                      <div className="flex flex-col md:flex-row gap-6">
+                        {/* Global Settings Card */}
+                        <div className="flex-1 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                          <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-sm">
+                            <div className="bg-violet-100 p-1.5 rounded-lg text-violet-600"><SettingsIcon size={16} /></div> General Settings
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-slate-500">Video Format</span>
+                              <select value={aspectRatio} onChange={(e) => {
+                                setAspectRatio(e.target.value);
+                                if (e.target.value === '16:9') { window.exportW = 1280; window.exportH = 720; }
+                                else { window.exportW = 720; window.exportH = 1280; }
+                              }} className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none w-32 focus:border-violet-500 transition-colors">
+                                <option value="9:16">Reel (9:16)</option>
+                                <option value="16:9">Video (16:9)</option>
+                              </select>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-slate-500">Visual Effect</span>
+                              <select value={visualEffect} onChange={(e) => setVisualEffect(e.target.value)}
+                                className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none w-32 focus:border-violet-500 transition-colors">
+                                <option value="none">No Effect</option>
+                                <option value="snow">Snow</option>
+                                <option value="rain">Rain</option>
+                                <option value="confetti">Confetti</option>
+                                <option value="stars">Stars</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex-1 w-full flex items-center justify-between">
-                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                            <SlidersIcon size={16} className="text-violet-500" /> Voice Vol:
-                          </label>
-                          <input type="range" min="0" max="100" value={voiceVolume} onChange={(e) => setVoiceVolume(Number(e.target.value))} className="w-1/2 accent-violet-500 cursor-pointer" />
+
+                        {/* Audio Settings Card */}
+                        <div className="flex-1 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                          <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-sm">
+                            <div className="bg-emerald-100 p-1.5 rounded-lg text-emerald-600"><Volume2Icon size={16} /></div> Audio Settings
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-slate-500 min-w-max">AI Voice</span>
+                              <div className="flex items-center flex-1 gap-2">
+                                <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}
+                                  className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none flex-1 focus:border-emerald-500 transition-colors">
+                                  <optgroup label="Arabic">
+                                    {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'ar').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                  </optgroup>
+                                  <optgroup label="English">
+                                    {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'en').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                  </optgroup>
+                                </select>
+                                <button onClick={handlePreviewVoice} className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" disabled={isPreviewingVoice && !previewAudio} title="Preview Voice">
+                                  {isPreviewingVoice ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-slate-500 min-w-max">Background</span>
+                              <div className="flex items-center flex-1 gap-2">
+                                <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none flex-1 focus:border-emerald-500 transition-colors">
+                                  {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.name}</option>)}
+                                </select>
+                                <button onClick={togglePreviewMusic} className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Preview Music Track">
+                                  {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col md:flex-row gap-4 items-center px-2 pt-2 border-t border-slate-200">
-                        <div className="flex-1 w-full flex items-center justify-between">
-                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                            <MusicIcon size={16} className="text-emerald-500" /> Music:
-                          </label>
-                          <div className="w-1/2 flex gap-2">
-                            <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.name}</option>)}
-                            </select>
-                            <button onClick={togglePreviewMusic} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors hidden md:flex" title="Preview Music Track">
-                               {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex-1 w-full flex items-center justify-between">
-                          <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                            <SlidersIcon size={16} className="text-emerald-500" /> Music Vol:
-                          </label>
-                          <input type="range" min="0" max="100" value={bgmVolume} onChange={(e) => setBgmVolume(Number(e.target.value))} className="w-1/2 accent-emerald-500 cursor-pointer" />
-                        </div>
-                      </div>
                     </div>
                     <div className="flex border-b border-slate-200">
                       <button onClick={() => setInputMode('prompt')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'prompt' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><Edit3Icon size={18} /> Write Prompt</button>
