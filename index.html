@@ -894,7 +894,7 @@
         }
       };
 
-      const handleSubmitYoutube = (e) => { e.preventDefault(); if (ytUrl.includes('youtube.com') || ytUrl.includes('youtu.be')) processCreation(ytUrl, 'youtube'); else alert('Please enter a valid YouTube URL'); };
+      const handleSubmitLink = (e) => { e.preventDefault(); if (ytUrl.trim().startsWith('http')) processCreation(ytUrl, 'link'); else alert('Please enter a valid webpage URL (starting with http)'); };
       const handleSubmitPrompt = (e) => { e.preventDefault(); if (promptText.trim().length > 5) processCreation(promptText, 'prompt'); else alert('Please enter a detailed prompt.'); };
 
       const rmSaveProject = () => {
@@ -1083,7 +1083,7 @@
                         </label>
                       )}
                       {inputMode === 'youtube' && (
-                        <form onSubmit={handleSubmitYoutube} className="space-y-4">
+                        <form onSubmit={handleSubmitLink} className="space-y-4">
                           <div className="relative">
                             <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                             <input type="url" required placeholder="https://example.com/article" value={ytUrl} onChange={e => setYtUrl(e.target.value)}
