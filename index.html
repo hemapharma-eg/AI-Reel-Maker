@@ -1306,6 +1306,13 @@
                         </div>
                         
                         <div className="relative aspect-video rounded-xl overflow-hidden mb-3 border border-slate-200 bg-slate-200 group/img">
+                            {scene.isGeneratingImage && (
+                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-20">
+                                 <LoaderIcon size={24} className="text-violet-500 animate-spin mb-2" />
+                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Generating AI Image...</span>
+                               </div>
+                            )}
+
                             {scene.imageUrl ? (
                               <>
                                 <img src={scene.imageUrl} alt={`Scene ${idx+1}`} className="w-full h-full object-cover" />
@@ -1319,21 +1326,14 @@
                               </>
                             ) : (
                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 border-2 border-dashed border-slate-300">
-                                 {scene.isGeneratingImage ? (
-                                   <div className="flex flex-col items-center">
-                                     <LoaderIcon size={24} className="text-violet-500 animate-spin mb-2" />
-                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Generating AI Image...</span>
-                                   </div>
-                                 ) : (
-                                   <div className="flex flex-col items-center gap-3">
-                                     <label className="cursor-pointer flex flex-col items-center group">
-                                       <ImageIcon className="text-slate-400 group-hover:text-violet-500 transition-colors mb-1" size={24} />
-                                       <span className="text-[10px] font-bold text-slate-500 group-hover:text-violet-600 transition-colors uppercase">Upload {idx+1}.jpg</span>
-                                       <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
-                                     </label>
-                                     <button onClick={() => regenerateSingleImage(idx, scene.image_prompt, scene.search_query)} className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm">Generate AI Image</button>
-                                   </div>
-                                 )}
+                                 <div className="flex flex-col items-center gap-3">
+                                   <label className="cursor-pointer flex flex-col items-center group">
+                                     <ImageIcon className="text-slate-400 group-hover:text-violet-500 transition-colors mb-1" size={24} />
+                                     <span className="text-[10px] font-bold text-slate-500 group-hover:text-violet-600 transition-colors uppercase">Upload {idx+1}.jpg</span>
+                                     <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
+                                   </label>
+                                   <button onClick={() => regenerateSingleImage(idx, scene.image_prompt, scene.search_query)} className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm">Generate AI Image</button>
+                                 </div>
                                </div>
                             )}
                         </div>
