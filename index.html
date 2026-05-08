@@ -672,16 +672,15 @@
             }
             const body = await res.text().catch(() => '');
             const waitMatch = body.match(/retry in ([\d.]+)s/i);
-            const waitTime = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) * 1000 + 2000 : delay;
+            const waitTime = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) * 1000 + 1000 : delay;
             console.warn(`[ReelMaker] 429 Rate limited. Waiting ${Math.round(waitTime/1000)}s before retry ${i+1}/${maxRetries}...`);
-            setMsg(`Rate limited — waiting ${Math.round(waitTime/1000)}s before retry...`);
-            await new Promise(r => setTimeout(r, waitTime));
+            await new Promise(r => setTimeout(r, Math.min(waitTime, 10000))); // Don't wait more than 10s
             delay *= 1.5;
             continue;
           }
           return res;
         }
-        throw new Error("Rate limit exceeded after retries. Please wait a minute and try again.");
+        throw new Error("Rate limit exceeded. Please try again later.");
       };
 
       const generateSceneImage = async (prompt, searchQuery = "landscape") => {
@@ -888,27 +887,30 @@
         } catch (err) { console.error(err); setStatus('error'); setMsg(err.message || "Failed to analyze content."); }
       };
 
+      const [isGeneratingAllVoices, setIsGeneratingAllVoices] = useState(false);
+
       const generateAllVoiceovers = async () => {
-        const scenes = [...generatedScenes];
-        setStatus('generating');
+        setIsGeneratingAllVoices(true);
         const targetLang = getTargetLanguage();
         
-        for (let i = 0; i < scenes.length; i++) {
-          if (scenes[i].audioUrl) continue;
+        for (let i = 0; i < generatedScenes.length; i++) {
+          if (generatedScenes[i].audioUrl) continue;
           
-          setMsg(`Generating Voice (${i + 1}/${scenes.length})...`);
-          setGenerationProgress(((i) / scenes.length) * 100);
+          setGeneratedScenes(prev => { const u = [...prev]; u[i] = { ...u[i], isGeneratingAudio: true }; return u; });
           
-          const audioUrl = await generateSceneAudio(scenes[i].narration, selectedVoice, targetLang);
-          scenes[i] = { ...scenes[i], audioUrl };
-          setGeneratedScenes([...scenes]);
+          try {
+            const audioUrl = await generateSceneAudio(generatedScenes[i].narration, selectedVoice, targetLang);
+            setGeneratedScenes(prev => { const u = [...prev]; u[i] = { ...u[i], audioUrl, isGeneratingAudio: false }; return u; });
+          } catch (err) {
+            console.error("Audio generation failed for scene", i, err);
+            setGeneratedScenes(prev => { const u = [...prev]; u[i] = { ...u[i], isGeneratingAudio: false }; return u; });
+          }
           
-          if (i < scenes.length - 1) {
-            setMsg(`Cooling down...`);
-            await new Promise(r => setTimeout(r, 4000));
+          if (i < generatedScenes.length - 1) {
+            await new Promise(r => setTimeout(r, 2000)); // Small delay between requests
           }
         }
-        setStatus('complete');
+        setIsGeneratingAllVoices(false);
       };
 
       const handleScriptEdit = (index, newText) => { const u = [...generatedScenes]; u[index].narration = newText; u[index].audioUrl = null; setGeneratedScenes(u); };
@@ -1193,8 +1195,9 @@
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900"><SparklesIcon className="text-violet-500" /> Storyboard</h2>
                     <div className="flex gap-2">
-                      <button onClick={generateAllVoiceovers} disabled={generatedScenes.every(s => s.audioUrl)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50">
-                        <MicIcon size={14} /> Generate Voices
+                      <button onClick={generateAllVoiceovers} disabled={isGeneratingAllVoices || generatedScenes.every(s => s.audioUrl)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50">
+                        {isGeneratingAllVoices ? <MicIcon size={14} className="animate-spin" /> : <MicIcon size={14} />} 
+                        {isGeneratingAllVoices ? "Generating..." : "Generate Voices"}
                       </button>
                       <label className="cursor-pointer bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm">
                         <UploadCloudIcon size={14} /> Bulk Images
