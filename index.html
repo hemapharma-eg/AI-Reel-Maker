@@ -764,13 +764,10 @@
           console.log('[ReelMaker] Using Smart Fallback (Pollinations.ai)...');
           setMsg('Generating image via smart fallback...');
           
-          const cleanTags = prompt
-            .replace(/[^\w\s,]/g, ' ') 
-            .replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 400);
-            
-          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTags)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          const cleanTags = prompt.replace(/[^\w\s,]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 400);
+          const w = aspectRatio === '16:9' ? 1280 : 720;
+          const h = aspectRatio === '16:9' ? 720 : 1280;
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTags)}?width=${w}&height=${h}&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
           
           const res = await fetch(pollinationsUrl);
           if (res.ok) {
