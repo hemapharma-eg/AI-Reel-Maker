@@ -81,7 +81,7 @@
 
         const lowerName = name.toLowerCase();
         for (let key in Lib) { 
-          if (key.toLowerCase() === lowerName && (typeof Lib[key] === 'function')) return Lib[key]; 
+          if (key.toLowerCase() === lowerName && (typeof Lib[key] === 'function' || typeof Lib[key] === 'object')) return Lib[key]; 
         }
       }
       return (props) => (
@@ -328,7 +328,7 @@
       });
     };
 
-    const RMRecreatedPlayer = ({ scenes, selectedBgmId, bgmVolume, voiceVolume, targetLang }) => {
+    const RMRecreatedPlayer = ({ scenes, selectedBgmId, bgmVolume, voiceVolume, targetLang, visualEffect }) => {
       const [currentScene, setCurrentScene] = useState(0);
       const [isPlaying, setIsPlaying] = useState(false);
       const [isExporting, setIsExporting] = useState(false);
@@ -444,7 +444,11 @@
           bgGain.connect(dest);
           bgAudio.play().catch(e => console.warn("BGM Export play failed:", e));
           
-          const particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 4 + 1, speed: Math.random() * 3 + 1, opacity: Math.random() * 0.4 + 0.1 }));
+          let particles = [];
+          if (visualEffect === 'snow') particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 4 + 1, speed: Math.random() * 3 + 1, opacity: Math.random() * 0.4 + 0.1, type: 'snow' }));
+          else if (visualEffect === 'rain') particles = Array.from({length: 100}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, length: Math.random() * 20 + 10, speed: Math.random() * 10 + 15, opacity: Math.random() * 0.3 + 0.1, type: 'rain' }));
+          else if (visualEffect === 'confetti') particles = Array.from({length: 80}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 8 + 4, speed: Math.random() * 4 + 2, color: `hsl(${Math.random()*360}, 100%, 50%)`, rot: Math.random()*360, type: 'confetti' }));
+          else if (visualEffect === 'stars') particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 3 + 1, opacity: Math.random(), type: 'stars', twinkleSpeed: Math.random() * 0.05 + 0.01 }));
           
           recorder.start();
 
@@ -497,7 +501,19 @@
               ctx.drawImage(img, x, y, img.width * imgScale, img.height * imgScale);
               ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
               
-              particles.forEach(p => { p.y -= p.speed; if (p.y < 0) p.y = canvas.height; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${p.opacity})`; ctx.fill(); });
+              if (visualEffect !== 'none') {
+                particles.forEach(p => { 
+                  if (p.type === 'snow') {
+                    p.y -= p.speed; if (p.y < 0) p.y = canvas.height; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${p.opacity})`; ctx.fill(); 
+                  } else if (p.type === 'rain') {
+                    p.y += p.speed; if (p.y > canvas.height) p.y = 0; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 2, p.y + p.length); ctx.strokeStyle = `rgba(200,220,255,${p.opacity})`; ctx.lineWidth = 2; ctx.stroke();
+                  } else if (p.type === 'confetti') {
+                    p.y += p.speed; p.rot += 5; if (p.y > canvas.height) p.y = 0; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.fillStyle = p.color; ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore();
+                  } else if (p.type === 'stars') {
+                    p.opacity += p.twinkleSpeed; if (p.opacity > 1 || p.opacity < 0) p.twinkleSpeed *= -1; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${Math.abs(p.opacity)})`; ctx.fill();
+                  }
+                });
+              }
               
               ctx.fillStyle = 'rgba(0,0,0,0.7)';
               const boxHeight = canvas.height * 0.15, boxY = canvas.height - boxHeight - (canvas.height * 0.08);
@@ -601,6 +617,7 @@
       const [selectedBgm, setSelectedBgm] = useState(MUSIC_LIBRARY[0].url);
       const [bgmVolume, setBgmVolume] = useState(20);
       const [voiceVolume, setVoiceVolume] = useState(100);
+      const [visualEffect, setVisualEffect] = useState('none');
       
       const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
       const [previewAudio, setPreviewAudio] = useState(null);
@@ -637,7 +654,7 @@
           ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى). DO NOT use any local dialects."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly 5 consecutive scenes. For each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words. Avoid quotes inside it).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}\nCreate exactly 6 consecutive scenes. The first 5 scenes should cover the content. The 6th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words. Avoid quotes inside it).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
@@ -1053,6 +1070,14 @@
                                 {GLOBAL_VOICE_OPTIONS.filter(v => v.lang === 'en').map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                               </optgroup>
                             </select>
+                            <select value={visualEffect} onChange={(e) => setVisualEffect(e.target.value)}
+                              className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
+                              <option value="none">No Effect</option>
+                              <option value="snow">Snow</option>
+                              <option value="rain">Rain</option>
+                              <option value="confetti">Confetti</option>
+                              <option value="stars">Stars</option>
+                            </select>
                             <button onClick={handlePreviewVoice} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-violet-100 text-violet-600 hover:bg-violet-200 transition-colors hidden md:flex" disabled={isPreviewingVoice && !previewAudio} title="Preview Voice">
                                {isPreviewingVoice ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
                             </button>
@@ -1089,11 +1114,11 @@
                       </div>
                     </div>
                     <div className="flex border-b border-slate-200">
-                      <button onClick={() => setInputMode('upload')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'upload' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><UploadCloudIcon size={18} /> Upload Video</button>
-                      <button onClick={() => setInputMode('youtube')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'youtube' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><LinkIcon size={18} /> Webpage/Link</button>
                       <button onClick={() => setInputMode('prompt')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'prompt' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><Edit3Icon size={18} /> Write Prompt</button>
-                      <button onClick={() => setInputMode('load')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'load' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><FolderOpenIcon size={18} /> Load Project</button>
+                      <button onClick={() => setInputMode('youtube')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'youtube' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><LinkIcon size={18} /> Webpage/Link</button>
+                      <button onClick={() => setInputMode('upload')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'upload' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><UploadCloudIcon size={18} /> Upload Video</button>
                       <button onClick={() => setInputMode('pdf')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'pdf' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><PresentationIcon size={18} /> Upload PDF</button>
+                      <button onClick={() => setInputMode('load')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'load' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><FolderOpenIcon size={18} /> Load Project</button>
                     </div>
                     <div className="p-8">
                        {inputMode === 'upload' && (
@@ -1283,7 +1308,7 @@
                         <AlertCircleIcon size={18} /> Please ensure all scenes have uploaded images and generated voices.
                       </div>
                     )}
-                    <RMRecreatedPlayer scenes={generatedScenes} selectedBgmId={selectedBgm} bgmVolume={bgmVolume} voiceVolume={voiceVolume} targetLang={targetLang} />
+                    <RMRecreatedPlayer scenes={generatedScenes} selectedBgmId={selectedBgm} bgmVolume={bgmVolume} voiceVolume={voiceVolume} targetLang={targetLang} visualEffect={visualEffect} />
                   </div>
                 </div>
               </div>
