@@ -793,27 +793,7 @@
         } catch (err) { console.warn("TTS Error:", err); return null; }
       };
 
-      const regenerateSingleImage = async (index) => {
-        const u = [...generatedScenes];
-        u[index].isGeneratingImage = true;
-        setGeneratedScenes(u);
-        try {
-          const newImageUrl = await generateSceneImage(u[index].image_prompt, u[index].search_query);
-          setGeneratedScenes(prev => {
-            const u2 = [...prev];
-            u2[index] = { ...u2[index], imageUrl: newImageUrl, isGeneratingImage: false };
-            return u2;
-          });
-        } catch (err) {
-          console.error("Failed to regenerate image", err);
-          alert("Failed to generate image.");
-          setGeneratedScenes(prev => {
-            const u2 = [...prev];
-            u2[index] = { ...u2[index], isGeneratingImage: false };
-            return u2;
-          });
-        }
-      };
+      // (Removed regenerateSingleImage as per user request to disable auto image generation)
 
       const handleImagePromptEdit = (index, newText) => {
         const u = [...generatedScenes];
@@ -923,9 +903,18 @@
           setGeneratedScenes(prev => { const u = [...prev]; u[index] = { ...u[index], audioUrl: newAudioUrl, isGeneratingAudio: false }; return u; });
         } catch (err) { 
           console.error("Failed to regenerate audio", err); 
-          alert("Failed to generate audio."); 
           setGeneratedScenes(prev => { const u = [...prev]; u[index] = { ...u[index], isGeneratingAudio: false }; return u; });
         }
+      };
+
+      const playSceneAudio = (url) => {
+        if (previewAudio) { previewAudio.pause(); setPreviewAudio(null); }
+        const a = new Audio(url);
+        a.volume = voiceVolume / 100;
+        a.onended = () => setPreviewAudio(null);
+        a.onerror = () => setPreviewAudio(null);
+        a.play().catch(e => console.error(e));
+        setPreviewAudio(a);
       };
 
       const handleSubmitLink = (e) => { e.preventDefault(); if (ytUrl.trim().startsWith('http')) processCreation(ytUrl, 'link'); else alert('Please enter a valid webpage URL (starting with http)'); };
@@ -1210,13 +1199,19 @@
                       <div key={idx} className={`bg-slate-50 p-4 rounded-2xl border transition-all ${!scene.audioUrl ? 'border-rose-200 shadow-sm' : 'border-slate-200'}`}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-violet-500 uppercase tracking-wider">Scene {idx + 1}</span>
-                          <div className="flex gap-1">
-                             <button onClick={() => regenerateSingleImage(idx)} disabled={scene.isGeneratingImage} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-violet-600 hover:border-violet-200 disabled:opacity-50 transition-all" title="Regenerate Image">
-                               <Wand2Icon size={14} className={scene.isGeneratingImage ? 'animate-spin' : ''} />
-                             </button>
-                             <button onClick={() => regenerateSingleAudio(idx, scene.narration)} disabled={scene.isGeneratingAudio} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-violet-600 hover:border-violet-200 disabled:opacity-50 transition-all" title="Regenerate Voice">
-                               <MicIcon size={14} className={scene.isGeneratingAudio ? 'animate-spin' : ''} />
-                             </button>
+                          <div className="flex gap-1 items-center">
+                            {scene.audioUrl ? (
+                              <div className="flex gap-1 items-center bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                                <MicIcon size={14} className="text-emerald-500" title="Voice Generated" />
+                                <button onClick={() => playSceneAudio(scene.audioUrl)} className="text-emerald-600 hover:text-emerald-700 transition-colors" title="Play Voice">
+                                  <PlayIcon size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => regenerateSingleAudio(idx, scene.narration)} disabled={scene.isGeneratingAudio} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-violet-600 hover:border-violet-200 disabled:opacity-50 transition-all" title="Generate Voice">
+                                <MicIcon size={14} className={scene.isGeneratingAudio ? 'animate-spin' : ''} />
+                              </button>
+                            )}
                           </div>
                         </div>
                         
@@ -1243,7 +1238,12 @@
                           className="w-full bg-white border border-slate-200 text-slate-800 font-bold text-sm leading-tight mb-3 p-3 rounded-xl focus:outline-none focus:border-violet-500 resize-none transition-colors"
                           dir={targetLang === 'ar' ? 'rtl' : 'ltr'} rows={2} style={{ fontFamily: "'Tajawal', sans-serif" }} />
                         
-                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">AI Image Prompt</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block">AI Image Prompt</label>
+                          <button onClick={() => { navigator.clipboard.writeText(scene.image_prompt); alert('Prompt copied!'); }} className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 py-0.5 rounded font-bold transition-colors">
+                            Copy
+                          </button>
+                        </div>
                         <textarea value={scene.image_prompt} onChange={(e) => handleImagePromptEdit(idx, e.target.value)}
                           className="w-full bg-white border border-slate-200 text-slate-500 text-[11px] leading-tight p-2 rounded-lg focus:outline-none focus:border-violet-500 resize-none transition-colors"
                           rows={2} />
@@ -1278,9 +1278,9 @@
                         </div>
                       </div>
                     </div>
-                    {!generatedScenes.every(s => s.audioUrl) && (
+                    {(!generatedScenes.every(s => s.audioUrl) || !generatedScenes.every(s => s.imageUrl)) && (
                       <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-500 px-4 py-3 rounded-xl text-sm text-center flex items-center justify-center gap-2 font-medium">
-                        <AlertCircleIcon size={18} /> Please regenerate audio for modified scenes to play.
+                        <AlertCircleIcon size={18} /> Please ensure all scenes have uploaded images and generated voices.
                       </div>
                     )}
                     <RMRecreatedPlayer scenes={generatedScenes} selectedBgmId={selectedBgm} bgmVolume={bgmVolume} voiceVolume={voiceVolume} targetLang={targetLang} />
