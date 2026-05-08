@@ -620,7 +620,7 @@
       const [msg, setMsg] = useState('');
       const [generatedScenes, setGeneratedScenes] = useState([]);
       const [generationProgress, setGenerationProgress] = useState(0);
-      const [inputMode, setInputMode] = useState('upload');
+      const [inputMode, setInputMode] = useState('prompt');
       const [ytUrl, setYtUrl] = useState('');
       const [promptText, setPromptText] = useState('');
       const [selectedVoice, setSelectedVoice] = useState('Aoede');
@@ -707,6 +707,7 @@
           }
           return res;
         }
+        alert("⚠️ API Limit Exceeded! Your current API key is out of quota. Please open Settings and change your Gemini API key.");
         throw new Error("Rate limit exceeded. Please try again later.");
       };
 
@@ -1132,20 +1133,10 @@
                     <div className="flex border-b border-slate-200">
                       <button onClick={() => setInputMode('prompt')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'prompt' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><Edit3Icon size={18} /> Write Prompt</button>
                       <button onClick={() => setInputMode('youtube')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'youtube' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><LinkIcon size={18} /> Webpage/Link</button>
-                      <button onClick={() => setInputMode('upload')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'upload' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><UploadCloudIcon size={18} /> Upload Video</button>
                       <button onClick={() => setInputMode('pdf')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'pdf' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><PresentationIcon size={18} /> Upload PDF</button>
                       <button onClick={() => setInputMode('load')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'load' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><FolderOpenIcon size={18} /> Load Project</button>
                     </div>
                     <div className="p-8">
-                       {inputMode === 'upload' && (
-                        <label className="block cursor-pointer group">
-                          <input type="file" accept="video/*" onChange={(e) => processCreation(e.target.files[0], 'upload')} className="hidden" />
-                          <div className="border-2 border-dashed border-slate-300 hover:border-violet-400 rounded-2xl p-12 transition-all flex flex-col items-center gap-4 group-hover:bg-violet-50">
-                            <div className="p-4 bg-slate-100 rounded-full text-violet-500 group-hover:scale-110 transition-transform"><LayersIcon size={32} /></div>
-                            <p className="text-lg font-semibold text-slate-700">Choose a video file to remake</p>
-                          </div>
-                        </label>
-                      )}
                       {inputMode === 'youtube' && (
                         <form onSubmit={handleSubmitLink} className="space-y-4">
                           <div className="relative">
@@ -1457,6 +1448,7 @@
                 }
                 
                 if (i === maxRetries - 1) {
+                  alert("⚠️ API Limit Exceeded! Your current API key is out of quota. Please open Settings and change your Gemini API key.");
                   throw new Error(`Rate limit (429). Google says: "${apiMessage}"`);
                 }
                 const waitSec = Math.round(delay / 1000);
