@@ -671,7 +671,7 @@
             .replace(/\s+/g, ' ') // Remove extra spaces
             .trim();
             
-          const pollinationsUrl = `https://pollinations.ai/p/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
           
           const res = await fetch(pollinationsUrl);
           if (res.ok) {
@@ -700,9 +700,9 @@
         try {
           console.log(`[ReelMaker] AI blocked. Using placeholder for keyword: ${searchQuery}`);
           setMsg(`Network blocked AI images. Semantic placeholder...`);
-          // Search query might be empty or missing on first run/cached
-          const finalQuery = (searchQuery || "nature,abstract").replace(/[^a-zA-Z0-9]/g, ',');
-          const placeholderUrl = `https://loremflickr.com/720/1280/${encodeURIComponent(finalQuery)}/all?lock=${Math.floor(Math.random() * 10000)}`;
+          // Use more reliable placeholder terms and remove /all flag which often triggers cat fallback
+          const finalQuery = (searchQuery || "cinematic,scenery").replace(/[^a-zA-Z0-9]/g, ',');
+          const placeholderUrl = `https://loremflickr.com/720/1280/${encodeURIComponent(finalQuery)}?lock=${Math.floor(Math.random() * 10000)}`;
           
           const res = await fetch(placeholderUrl);
           if (res.ok) {
