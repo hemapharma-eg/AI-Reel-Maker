@@ -128,7 +128,9 @@
       { id: 'Kore', name: 'Arabic Female 2 (Strong)', lang: 'ar' },
       { id: 'Fenrir', name: 'Arabic Male 1 (Deep)', lang: 'ar' },
       { id: 'Charon', name: 'Arabic Male 2 (Engaging)', lang: 'ar' },
-      ...COMMON_VOICES.map(v => ({ id: v, name: `${v} (English)`, lang: 'en' }))
+      ...COMMON_VOICES
+        .filter(v => !['Aoede', 'Kore', 'Fenrir', 'Charon'].includes(v))
+        .map(v => ({ id: v, name: `${v} (English)`, lang: 'en' }))
     ];
 
     const MUSIC_LIBRARY = [
@@ -628,6 +630,7 @@
       const [bgmVolume, setBgmVolume] = useState(20);
       const [voiceVolume, setVoiceVolume] = useState(100);
       const [visualEffect, setVisualEffect] = useState('none');
+      const [sceneCountRange, setSceneCountRange] = useState('20-40');
       
       const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
       const [previewAudio, setPreviewAudio] = useState(null);
@@ -659,12 +662,12 @@
 
       const getTargetLanguage = () => { const voice = GLOBAL_VOICE_OPTIONS.find(v => v.id === selectedVoice); return voice ? voice.lang : 'en'; };
 
-      const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en') => {
+      const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en', targetSceneCount = 6) => {
         const langInstruction = lang === 'ar'
           ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى) WITH full diacritics (التشكيل الكامل) for every word."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly 6 consecutive scenes. The first 5 scenes should cover the content. The 6th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nCRITICAL: The script must flow continuously like a cohesive story or narrative from scene 1 to scene 6. Do NOT make them sound like disconnected, scattered facts.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). Avoid quotes inside it. Ensure smooth transitions from the previous scene.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene.\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}\nCreate exactly ${targetSceneCount} consecutive scenes. The first ${targetSceneCount - 1} scenes should cover the content. The ${targetSceneCount}th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nCRITICAL: The script must flow continuously like a cohesive story or narrative from scene 1 to scene ${targetSceneCount}. Do NOT make them sound like disconnected, scattered facts.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). Avoid quotes inside it. Ensure smooth transitions from the previous scene.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene.\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
@@ -861,24 +864,55 @@
         });
       };
 
+      const regenerateSingleImage = async (index, prompt, searchQuery) => {
+        setGeneratedScenes(prev => {
+          const u = [...prev];
+          u[index] = { ...u[index], isGeneratingImage: true };
+          return u;
+        });
+        try {
+          const imageUrl = await generateSceneImage(prompt, searchQuery);
+          setGeneratedScenes(prev => {
+            const u = [...prev];
+            u[index] = { ...u[index], imageUrl, isGeneratingImage: false };
+            return u;
+          });
+        } catch (e) {
+          console.error(e);
+          setGeneratedScenes(prev => {
+            const u = [...prev];
+            u[index] = { ...u[index], isGeneratingImage: false };
+            return u;
+          });
+          alert('Failed to generate image. Please try again.');
+        }
+      };
+
       const processCreation = async (data, mode) => {
         try {
           setStatus('analyzing');
           let scenes = [];
           const targetLang = getTargetLanguage();
+          
+          let targetCount = 6;
+          if (aspectRatio === '16:9') {
+            const [min, max] = sceneCountRange.split('-').map(Number);
+            targetCount = Math.floor((min + max) / 2); 
+          }
+
           if (mode === 'prompt') { 
             setMsg('Brainstorming & writing script from prompt...'); 
-            scenes = await generateRecreationScript([], null, data, targetLang); 
+            scenes = await generateRecreationScript([], null, data, targetLang, targetCount); 
           }
           else if (mode === 'link') { 
             setMsg('Analyzing content & writing script...'); 
-            scenes = await generateRecreationScript([], data, null, targetLang); 
+            scenes = await generateRecreationScript([], data, null, targetLang, targetCount); 
           }
           else if (mode === 'pdf') {
             setMsg('Extracting text from PDF...');
             const pdfText = await extractTextFromPdf(data);
             setMsg('Simplifying research/content into a viral script...');
-            scenes = await generateRecreationScript([], null, pdfText, targetLang);
+            scenes = await generateRecreationScript([], null, pdfText, targetLang, targetCount);
           }
           else { 
             setMsg('Extracting frames from original video...'); 
@@ -1077,6 +1111,18 @@
                                 <option value="16:9">Video (16:9)</option>
                               </select>
                             </div>
+                            {aspectRatio === '16:9' && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-slate-500">Scene Count</span>
+                                <select value={sceneCountRange} onChange={(e) => setSceneCountRange(e.target.value)}
+                                  className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg p-2 outline-none w-32 focus:border-violet-500 transition-colors">
+                                  <option value="20-40">20-40 Scenes</option>
+                                  <option value="40-60">40-60 Scenes</option>
+                                  <option value="60-80">60-80 Scenes</option>
+                                  <option value="80-100">80-100 Scenes</option>
+                                </select>
+                              </div>
+                            )}
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium text-slate-500">Visual Effect</span>
                               <select value={visualEffect} onChange={(e) => setVisualEffect(e.target.value)}
@@ -1248,21 +1294,36 @@
                         </div>
                         
                         <div className="relative aspect-video rounded-xl overflow-hidden mb-3 border border-slate-200 bg-slate-200 group/img">
-                           {scene.imageUrl ? (
-                             <>
-                               <img src={scene.imageUrl} alt={`Scene ${idx+1}`} className="w-full h-full object-cover" />
-                               <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer">
-                                 <span className="text-white text-xs font-bold bg-violet-600 px-3 py-1.5 rounded-full">Change Image</span>
-                                 <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
-                               </label>
-                             </>
-                           ) : (
-                             <label className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer border-2 border-dashed border-slate-300">
-                               <ImageIcon className="text-slate-400 mb-2" size={24} />
-                               <span className="text-[10px] font-bold text-slate-500 uppercase">Upload {idx+1}.jpg</span>
-                               <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
-                             </label>
-                           )}
+                            {scene.imageUrl ? (
+                              <>
+                                <img src={scene.imageUrl} alt={`Scene ${idx+1}`} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity gap-2">
+                                  <label className="cursor-pointer">
+                                    <span className="text-white text-xs font-bold bg-violet-600 px-3 py-1.5 rounded-full shadow-lg hover:bg-violet-500 transition-colors">Change Image</span>
+                                    <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
+                                  </label>
+                                  <button onClick={() => regenerateSingleImage(idx, scene.image_prompt, scene.search_query)} className="text-white text-xs font-bold bg-emerald-600 px-3 py-1.5 rounded-full shadow-lg hover:bg-emerald-500 transition-colors">Regenerate AI</button>
+                                </div>
+                              </>
+                            ) : (
+                               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 border-2 border-dashed border-slate-300">
+                                 {scene.isGeneratingImage ? (
+                                   <div className="flex flex-col items-center">
+                                     <LoaderIcon size={24} className="text-violet-500 animate-spin mb-2" />
+                                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Generating AI Image...</span>
+                                   </div>
+                                 ) : (
+                                   <div className="flex flex-col items-center gap-3">
+                                     <label className="cursor-pointer flex flex-col items-center group">
+                                       <ImageIcon className="text-slate-400 group-hover:text-violet-500 transition-colors mb-1" size={24} />
+                                       <span className="text-[10px] font-bold text-slate-500 group-hover:text-violet-600 transition-colors uppercase">Upload {idx+1}.jpg</span>
+                                       <input type="file" accept="image/*" onChange={(e) => handleSingleImageUpload(idx, e.target.files[0])} className="hidden" />
+                                     </label>
+                                     <button onClick={() => regenerateSingleImage(idx, scene.image_prompt, scene.search_query)} className="text-[10px] font-bold text-emerald-600 uppercase bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm">Generate AI Image</button>
+                                   </div>
+                                 )}
+                               </div>
+                            )}
                         </div>
 
                         <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Voiceover Script</label>
