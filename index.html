@@ -13,6 +13,7 @@
   <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   
   <!-- Clerk Authentication SDK -->
   <script async crossorigin="anonymous" 
@@ -205,6 +206,20 @@
       video.onerror = () => reject(new Error("Failed to get video duration"));
     });
 
+    const extractTextFromPdf = async (file) => {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(" ");
+        fullText += pageText + "\n";
+        if (fullText.length > 10000) break; // Limit extraction
+      }
+      return fullText;
+    };
+
 
     function downloadWordTemplate() {
       const xmlHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -317,6 +332,7 @@
       const [currentScene, setCurrentScene] = useState(0);
       const [isPlaying, setIsPlaying] = useState(false);
       const [isExporting, setIsExporting] = useState(false);
+      const [exportProgress, setExportProgress] = useState(0);
       const [exportedVideoUrl, setExportedVideoUrl] = useState(null);
       const audioRef = useRef(null);
       const bgAudioRef = useRef(null);
@@ -386,11 +402,19 @@
       const exportVideo = async (e) => {
         e.stopPropagation();
         if (isExporting) return;
-        setIsExporting(true); setExportedVideoUrl(null);
+        setIsExporting(true); setExportedVideoUrl(null); setExportProgress(0);
         let audioCtx = null;
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = 720; canvas.height = 1280;
+          const isWide = targetLang === 'ar' ? false : (window.ReelAspectRatio === '16:9'); // Global or passed aspect ratio
+          // We need to access the aspect ratio. Let's assume it's passed or available.
+          // Since I can't easily change the prop signature without updating all calls, 
+          // I'll look at the props of RMRecreatedPlayer.
+          // It doesn't have it. I should add it.
+          
+          canvas.width = window.exportW || 720; 
+          canvas.height = window.exportH || 1280;
+          
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
           let stream;
@@ -419,11 +443,22 @@
           bgSource.connect(bgGain);
           bgGain.connect(dest);
           bgAudio.play().catch(e => console.warn("BGM Export play failed:", e));
+          
           const particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 4 + 1, speed: Math.random() * 3 + 1, opacity: Math.random() * 0.4 + 0.1 }));
-          for (const scene of scenes) {
+          
+          recorder.start();
+
+          for (let i = 0; i < scenes.length; i++) {
+            const scene = scenes[i];
+            setExportProgress(Math.round(((i) / scenes.length) * 100));
+            
             const img = new Image(); img.crossOrigin = 'anonymous';
             await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = scene.imageUrl; });
-            let isScenePlaying = true; let source;
+            
+            let isScenePlaying = true; 
+            let source = null;
+            let audioTimeout = null;
+
             if (scene.audioUrl) {
               const audio = new Audio(scene.audioUrl); audio.crossOrigin = "anonymous";
               source = audioCtx.createMediaElementSource(audio);
@@ -431,54 +466,71 @@
               voiceGain.gain.value = voiceVolume / 100;
               source.connect(voiceGain);
               voiceGain.connect(dest);
-              audio.onended = () => { isScenePlaying = false; }; audio.onerror = () => { isScenePlaying = false; };
+              
+              const finishScene = () => { isScenePlaying = false; if (audioTimeout) clearTimeout(audioTimeout); };
+              audio.onended = finishScene; 
+              audio.onerror = finishScene;
+              
+              // Safety timeout: if audio is 10s, but hangs, we break at 15s
+              audioTimeout = setTimeout(finishScene, 15000); 
+
               await audio.play().catch(() => { isScenePlaying = false; });
-            } else { setTimeout(() => { isScenePlaying = false; }, 4000); }
+            } else { 
+              setTimeout(() => { isScenePlaying = false; }, 4000); 
+            }
+
             const startTime = performance.now();
             while (isScenePlaying || (performance.now() - startTime < 4000)) {
-              if (performance.now() - startTime > 12000) { isScenePlaying = false; break; }
+              if (performance.now() - startTime > 20000) { isScenePlaying = false; break; } // Hard limit 20s per scene
               const elapsed = performance.now() - startTime;
               
-              const zoom = 1 + (elapsed / 5000) * 0.15; // 15% zoom
+              const zoom = 1 + (elapsed / 5000) * 0.15; 
               const imgScale = Math.max(canvas.width / img.width, canvas.height / img.height) * zoom;
               
               let x = (canvas.width / 2) - (img.width / 2) * imgScale;
               let y = (canvas.height / 2) - (img.height / 2) * imgScale;
               
-              // Apply Pan Effect
-              if (scene.animType === 'panLeft') {
-                 x += ((elapsed / 5000) * (canvas.width * 0.1));
-              } else {
-                 x -= ((elapsed / 5000) * (canvas.width * 0.1));
-              }
+              if (scene.animType === 'panLeft') x += ((elapsed / 5000) * (canvas.width * 0.1));
+              else x -= ((elapsed / 5000) * (canvas.width * 0.1));
 
               ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, x, y, img.width * imgScale, img.height * imgScale);
               ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+              
               particles.forEach(p => { p.y -= p.speed; if (p.y < 0) p.y = canvas.height; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${p.opacity})`; ctx.fill(); });
+              
               ctx.fillStyle = 'rgba(0,0,0,0.7)';
-              const boxHeight = 160, boxY = canvas.height - boxHeight - 80;
-              ctx.fillRect(40, boxY, canvas.width - 80, boxHeight);
-              ctx.fillStyle = 'white'; ctx.font = 'bold 46px Tajawal, Cairo, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              const boxHeight = canvas.height * 0.15, boxY = canvas.height - boxHeight - (canvas.height * 0.08);
+              ctx.fillRect(canvas.width * 0.05, boxY, canvas.width * 0.9, boxHeight);
+              
+              ctx.fillStyle = 'white'; 
+              const fontSize = Math.floor(canvas.width * 0.06);
+              ctx.font = `bold ${fontSize}px Tajawal, Cairo, sans-serif`; 
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
               ctx.direction = targetLang === 'ar' ? 'rtl' : 'ltr';
+              
               const words = scene.narration.split(' '); let line = ''; const lines = [];
-              for (let n = 0; n < words.length; n++) { const testLine = line + words[n] + ' '; if (ctx.measureText(testLine).width > canvas.width - 120 && n > 0) { lines.push(line); line = words[n] + ' '; } else { line = testLine; } }
+              for (let n = 0; n < words.length; n++) { const testLine = line + words[n] + ' '; if (ctx.measureText(testLine).width > canvas.width * 0.8 && n > 0) { lines.push(line); line = words[n] + ' '; } else { line = testLine; } }
               lines.push(line);
-              const lineHeight = 55, startY = boxY + (boxHeight / 2) - ((lines.length - 1) * lineHeight) / 2;
+              
+              const lineHeight = fontSize + 10, startY = boxY + (boxHeight / 2) - ((lines.length - 1) * lineHeight) / 2;
               lines.forEach((l, i) => { ctx.fillText(l.trim(), canvas.width / 2, startY + (i * lineHeight)); });
+              
               await new Promise(r => setTimeout(r, 1000/30));
             }
             if (source) source.disconnect();
           }
+          
+          setExportProgress(100);
           bgAudio.pause();
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 500));
           recorder.stop();
           await new Promise(r => recorder.onstop = r);
           const blob = new Blob(chunks, { type: mimeType });
           const url = URL.createObjectURL(blob);
           setExportedVideoUrl(url);
           const a = document.createElement('a'); a.href = url;
-          a.download = mimeType.includes('mp4') ? 'ReMaker_AI_Reel.mp4' : 'ReMaker_AI_Reel.webm';
+          a.download = mimeType.includes('mp4') ? 'ReMaker_AI_Video.mp4' : 'ReMaker_AI_Video.webm';
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
         } catch (err) { console.error("Export failed:", err); alert("Export Error: " + err.message); }
         finally { setIsExporting(false); if (audioCtx && audioCtx.state !== 'closed') audioCtx.close(); }
@@ -491,7 +543,7 @@
 
       return (
         <div className="w-full">
-          <div className="relative aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-xl border border-slate-700 cursor-pointer group" onClick={togglePlay}>
+          <div className={`relative ${window.exportW > window.exportH ? 'aspect-video' : 'aspect-[9/16]'} bg-black rounded-2xl overflow-hidden shadow-xl border border-slate-700 cursor-pointer group`} onClick={togglePlay}>
             <audio ref={audioRef} className="hidden" />
             {scenes.map((scene, index) => {
               const animClass = scene.animType === 'panLeft' 
@@ -526,7 +578,7 @@
           <button onClick={exportVideo} disabled={isExporting || !isReadyToPlay}
             className="w-full mt-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden">
             {isExporting && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
-            {isExporting ? <span className="relative z-10 flex items-center gap-2">Rendering Video... <span className="animate-spin text-xl">⏳</span></span> : <><DownloadIcon size={20} /> Export Video</>}
+            {isExporting ? <span className="relative z-10 flex items-center gap-2">Rendering ({exportProgress}%)... <span className="animate-spin text-xl">⏳</span></span> : <><DownloadIcon size={20} /> Export Video</>}
           </button>
           {exportedVideoUrl && !isExporting && (
             <div className="mt-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl text-center">
@@ -554,6 +606,7 @@
       const [previewAudio, setPreviewAudio] = useState(null);
       const [isPreviewingMusic, setIsPreviewingMusic] = useState(false);
       const [musicAudio, setMusicAudio] = useState(null);
+      const [aspectRatio, setAspectRatio] = useState('9:16'); // '9:16' or '16:9'
 
       const AlertCircleIcon = getSafeIcon('AlertCircle') || getSafeIcon('X');
       const Volume2Icon = getSafeIcon('Volume2') || getSafeIcon('Mic');
@@ -581,7 +634,7 @@
 
       const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en') => {
         const langInstruction = lang === 'ar'
-          ? "IMPORTANT: The script MUST be written in the Egyptian Arabic dialect. IN EGYPTIAN ARABIC."
+          ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى). DO NOT use any local dialects."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
         const sceneInstruction = `${langInstruction}\nCreate exactly 5 consecutive scenes. For each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words. Avoid quotes inside it).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
@@ -590,7 +643,7 @@
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
           payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
         } else if (youtubeUrl) {
-          prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this YouTube video: ${youtubeUrl}. Create a completely new script.\n${sceneInstruction}`;
+          prompt = `The user wants to create a highly engaging, faceless viral video based on this webpage/content: ${youtubeUrl}. Summarize the key points and create a completely new script.\n${sceneInstruction}`;
           payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
         } else {
           prompt = `Analyze these frames from an uploaded video. RECREATE this video into a highly engaging, faceless viral TikTok/Reel.\n${sceneInstruction}`;
@@ -632,7 +685,8 @@
       };
 
       const generateSceneImage = async (prompt, searchQuery = "landscape") => {
-        const enhancedPrompt = prompt + " -- cinematic lighting, highly detailed, photorealistic, 8k resolution, vertical composition";
+        const orientation = aspectRatio === '16:9' ? 'horizontal' : 'vertical';
+        const enhancedPrompt = prompt + ` -- cinematic lighting, highly detailed, photorealistic, 8k resolution, ${orientation} composition`;
         
         // --- Try 1: Imagen 4.0 (paid plans only) ---
         try {
@@ -720,7 +774,7 @@
 
       const generateSceneAudio = async (text, voiceName = "Aoede", lang = 'en') => {
         try {
-          const speechInstruction = lang === 'ar' ? `Say in an Egyptian Arabic accent: ${text}` : `Say in a natural, engaging tone: ${text}`;
+          const speechInstruction = lang === 'ar' ? `Say in Modern Standard Arabic (Fusha): ${text}` : `Say in a natural, engaging tone: ${text}`;
           const payload = { contents: [{ parts: [{ text: speechInstruction }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } };
           const response = await rmFetchWithRetry(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
@@ -740,14 +794,59 @@
         } catch (err) { console.warn("TTS Error:", err); return null; }
       };
 
+      const regenerateSingleImage = async (index) => {
+        const u = [...generatedScenes];
+        u[index].isGeneratingImage = true;
+        setGeneratedScenes(u);
+        try {
+          const newImageUrl = await generateSceneImage(u[index].image_prompt, u[index].search_query);
+          setGeneratedScenes(prev => {
+            const u2 = [...prev];
+            u2[index] = { ...u2[index], imageUrl: newImageUrl, isGeneratingImage: false };
+            return u2;
+          });
+        } catch (err) {
+          console.error("Failed to regenerate image", err);
+          alert("Failed to generate image.");
+          setGeneratedScenes(prev => {
+            const u2 = [...prev];
+            u2[index] = { ...u2[index], isGeneratingImage: false };
+            return u2;
+          });
+        }
+      };
+
+      const handleImagePromptEdit = (index, newText) => {
+        const u = [...generatedScenes];
+        u[index].image_prompt = newText;
+        setGeneratedScenes(u);
+      };
+
       const processCreation = async (data, mode) => {
         try {
           setStatus('analyzing');
           let scenes = [];
           const targetLang = getTargetLanguage();
-          if (mode === 'prompt') { setMsg('Brainstorming & writing script from prompt...'); scenes = await generateRecreationScript([], null, data, targetLang); }
-          else if (mode === 'youtube') { setMsg('Analyzing YouTube context & writing script...'); scenes = await generateRecreationScript([], data, null, targetLang); }
-          else { setMsg('Extracting frames from original video...'); const { frames } = await rmExtractFrames(data); setMsg('AI is writing a viral script...'); scenes = await generateRecreationScript(frames, null, null, targetLang); }
+          if (mode === 'prompt') { 
+            setMsg('Brainstorming & writing script from prompt...'); 
+            scenes = await generateRecreationScript([], null, data, targetLang); 
+          }
+          else if (mode === 'link') { 
+            setMsg('Analyzing content & writing script...'); 
+            scenes = await generateRecreationScript([], data, null, targetLang); 
+          }
+          else if (mode === 'pdf') {
+            setMsg('Extracting text from PDF...');
+            const pdfText = await extractTextFromPdf(data);
+            setMsg('Simplifying research/content into a viral script...');
+            scenes = await generateRecreationScript([], null, pdfText, targetLang);
+          }
+          else { 
+            setMsg('Extracting frames from original video...'); 
+            const { frames } = await rmExtractFrames(data); 
+            setMsg('AI is writing a viral script...'); 
+            scenes = await generateRecreationScript(frames, null, null, targetLang); 
+          }
           
           // Optional safety defaults in case Gemini omits them
           scenes = scenes.map(s => ({...s, animType: Math.random() > 0.5 ? 'panLeft' : 'panRight', search_query: s.search_query || "landscape" }));
@@ -911,9 +1010,17 @@
                       <div className="flex flex-col md:flex-row gap-4 items-center px-2">
                         <div className="flex-1 w-full flex items-center justify-between">
                           <label className="text-slate-700 font-medium text-sm flex items-center gap-2">
-                            <Volume2Icon size={16} className="text-violet-500" /> Voiceover:
+                            <Volume2Icon size={16} className="text-violet-500" /> Settings:
                           </label>
-                          <div className="w-1/2 flex gap-2">
+                          <div className="w-2/3 flex gap-2">
+                            <select value={aspectRatio} onChange={(e) => {
+                               setAspectRatio(e.target.value);
+                               if (e.target.value === '16:9') { window.exportW = 1280; window.exportH = 720; }
+                               else { window.exportW = 720; window.exportH = 1280; }
+                            }} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
+                               <option value="9:16">Reel (9:16)</option>
+                               <option value="16:9">Video (16:9)</option>
+                            </select>
                             <select value={selectedVoice} onChange={(e) => setSelectedVoice(e.target.value)}
                               className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
                               <optgroup label="Arabic">
@@ -943,7 +1050,7 @@
                           </label>
                           <div className="w-1/2 flex gap-2">
                             <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.title}</option>)}
+                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.name}</option>)}
                             </select>
                             <button onClick={togglePreviewMusic} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors hidden md:flex" title="Preview Music Track">
                                {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
@@ -960,9 +1067,10 @@
                     </div>
                     <div className="flex border-b border-slate-200">
                       <button onClick={() => setInputMode('upload')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'upload' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><UploadCloudIcon size={18} /> Upload Video</button>
-                      <button onClick={() => setInputMode('youtube')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'youtube' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><LinkIcon size={18} /> Paste Link</button>
+                      <button onClick={() => setInputMode('youtube')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'youtube' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><LinkIcon size={18} /> Webpage/Link</button>
                       <button onClick={() => setInputMode('prompt')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'prompt' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><Edit3Icon size={18} /> Write Prompt</button>
                       <button onClick={() => setInputMode('load')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'load' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><FolderOpenIcon size={18} /> Load Project</button>
+                      <button onClick={() => setInputMode('pdf')} className={`flex-1 py-4 text-sm md:text-base font-semibold flex items-center justify-center gap-2 ${inputMode === 'pdf' ? 'bg-violet-50 text-violet-600 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-700'}`}><PresentationIcon size={18} /> Upload PDF</button>
                     </div>
                     <div className="p-8">
                        {inputMode === 'upload' && (
@@ -978,10 +1086,10 @@
                         <form onSubmit={handleSubmitYoutube} className="space-y-4">
                           <div className="relative">
                             <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                            <input type="url" required placeholder="https://www.youtube.com/watch?v=..." value={ytUrl} onChange={e => setYtUrl(e.target.value)}
+                            <input type="url" required placeholder="https://example.com/article" value={ytUrl} onChange={e => setYtUrl(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-slate-800 focus:outline-none focus:border-violet-500" />
                           </div>
-                          <button type="submit" className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors">Generate from Link</button>
+                          <button type="submit" className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors">Generate from Webpage</button>
                         </form>
                       )}
                       {inputMode === 'prompt' && (
@@ -998,6 +1106,16 @@
                             <div className="p-4 bg-slate-100 rounded-full text-emerald-500 group-hover:scale-110 transition-transform"><FolderOpenIcon size={32} /></div>
                             <p className="text-lg font-semibold text-slate-700">Choose a saved .json project file</p>
                             <p className="text-sm text-slate-400">Pick up exactly where you left off.</p>
+                          </div>
+                        </label>
+                      )}
+                      {inputMode === 'pdf' && (
+                        <label className="block cursor-pointer group">
+                          <input type="file" accept="application/pdf" onChange={(e) => processCreation(e.target.files[0], 'pdf')} className="hidden" />
+                          <div className="border-2 border-dashed border-slate-300 hover:border-violet-400 rounded-2xl p-12 transition-all flex flex-col items-center gap-4 group-hover:bg-violet-50">
+                            <div className="p-4 bg-slate-100 rounded-full text-violet-500 group-hover:scale-110 transition-transform"><PresentationIcon size={32} /></div>
+                            <p className="text-lg font-semibold text-slate-700">Choose a PDF Research Article/Chapter</p>
+                            <p className="text-sm text-slate-400">AI will simplify it into a short-form video.</p>
                           </div>
                         </label>
                       )}
@@ -1044,23 +1162,35 @@
                   <div className="space-y-4">
                     {generatedScenes.map((scene, idx) => (
                       <div key={idx} className={`bg-slate-50 p-4 rounded-2xl border transition-all ${!scene.audioUrl ? 'border-rose-200 shadow-sm' : 'border-slate-200'}`}>
-                        <span className="text-xs font-bold text-violet-500 mb-2 block uppercase tracking-wider">Scene {idx + 1}</span>
-                        <textarea value={scene.narration} onChange={(e) => handleScriptEdit(idx, e.target.value)}
-                          className="w-full bg-white border border-slate-200 text-slate-800 font-bold text-lg leading-tight mb-3 p-3 rounded-xl focus:outline-none focus:border-violet-500 resize-none transition-colors"
-                          dir={targetLang === 'ar' ? 'rtl' : 'ltr'} rows={3} style={{ fontFamily: "'Tajawal', sans-serif" }} />
-                        <div className="flex items-center justify-between mt-2">
-                          {scene.audioUrl ? (
-                            <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1 border border-emerald-100"><CheckCircle2Icon size={12}/> Ready to play</span>
-                          ) : (
-                            <span className="text-xs text-rose-500 bg-rose-50 px-2 py-1 rounded flex items-center gap-1 border border-rose-100"><AlertCircleIcon size={12}/> Voice generation required</span>
-                          )}
-                          {!scene.audioUrl && (
-                            <button onClick={() => regenerateSingleAudio(idx, scene.narration)} disabled={scene.isGeneratingAudio}
-                              className="text-xs bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 font-bold">
-                              {scene.isGeneratingAudio ? <SparklesIcon size={14} className="animate-spin" /> : <Volume2Icon size={14} />} Regenerate Voice
-                            </button>
-                          )}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-violet-500 uppercase tracking-wider">Scene {idx + 1}</span>
+                          <div className="flex gap-1">
+                             <button onClick={() => regenerateSingleImage(idx)} disabled={scene.isGeneratingImage} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-violet-600 hover:border-violet-200 disabled:opacity-50 transition-all" title="Regenerate Image">
+                               <Wand2Icon size={14} className={scene.isGeneratingImage ? 'animate-spin' : ''} />
+                             </button>
+                             <button onClick={() => regenerateSingleAudio(idx, scene.narration)} disabled={scene.isGeneratingAudio} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-violet-600 hover:border-violet-200 disabled:opacity-50 transition-all" title="Regenerate Voice">
+                               <MicIcon size={14} className={scene.isGeneratingAudio ? 'animate-spin' : ''} />
+                             </button>
+                          </div>
                         </div>
+                        
+                        <div className="relative aspect-video rounded-xl overflow-hidden mb-3 border border-slate-200 bg-slate-200">
+                           {scene.isGeneratingImage ? (
+                             <div className="absolute inset-0 flex items-center justify-center bg-slate-100"><span className="animate-spin text-violet-500">⏳</span></div>
+                           ) : (
+                             <img src={scene.imageUrl} alt={`Scene ${idx+1}`} className="w-full h-full object-cover" />
+                           )}
+                        </div>
+
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Voiceover Script</label>
+                        <textarea value={scene.narration} onChange={(e) => handleScriptEdit(idx, e.target.value)}
+                          className="w-full bg-white border border-slate-200 text-slate-800 font-bold text-sm leading-tight mb-3 p-3 rounded-xl focus:outline-none focus:border-violet-500 resize-none transition-colors"
+                          dir={targetLang === 'ar' ? 'rtl' : 'ltr'} rows={2} style={{ fontFamily: "'Tajawal', sans-serif" }} />
+                        
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">AI Image Prompt</label>
+                        <textarea value={scene.image_prompt} onChange={(e) => handleImagePromptEdit(idx, e.target.value)}
+                          className="w-full bg-white border border-slate-200 text-slate-500 text-[11px] leading-tight p-2 rounded-lg focus:outline-none focus:border-violet-500 resize-none transition-colors"
+                          rows={2} />
                       </div>
                     ))}
                   </div>
@@ -1079,7 +1209,7 @@
                           <label className="text-sm text-slate-500 flex items-center gap-2 w-1/3"><MusicIcon size={14}/> Track</label>
                           <div className="w-2/3 flex gap-2">
                             <select value={selectedBgm} onChange={(e) => setSelectedBgm(e.target.value)} className="bg-white border border-slate-200 text-slate-800 text-sm rounded-lg p-2 outline-none flex-1 min-w-0">
-                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.title}</option>)}
+                              {MUSIC_LIBRARY.map(t => <option key={t.url} value={t.url}>{t.name}</option>)}
                             </select>
                             <button onClick={togglePreviewMusic} className="shrink-0 flex items-center justify-center p-2 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition-colors" title="Preview Music Track">
                                {isPreviewingMusic ? <PauseIcon size={16}/> : <PlayIcon size={16}/>}
