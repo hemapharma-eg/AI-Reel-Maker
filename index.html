@@ -716,50 +716,50 @@
 
       const generateSceneImage = async (prompt, searchQuery = "landscape") => {
         const orientationDesc = aspectRatio === '16:9' ? 'wide horizontal' : 'tall vertical';
-        const enhancedPrompt = `Cinematic, highly detailed photorealistic shot: ${prompt}. Professional lighting, 8k resolution, ${orientationDesc} composition, masterpiece.`;
+        const googlePrompt = `Cinematic, highly detailed photorealistic shot: ${prompt}. Professional lighting, 8k resolution, ${orientationDesc} composition, masterpiece.`;
         
-        // --- Try 1: Google Imagen 3.0 (Part of Gemini Pro / AI Studio) ---
-        try {
-          const payload = { 
-            instances: [{ prompt: enhancedPrompt }], 
-            parameters: { 
-              sampleCount: 1, 
-              aspectRatio: aspectRatio === '16:9' ? "16:9" : "9:16",
-              safetySetting: "off"
-            } 
-          };
-          const res = await rmFetchWithRetry(
-            `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-            if (b64) {
-              console.log('[ReelMaker] ✅ Premium image generated with Google Imagen 3.0');
-              return `data:image/png;base64,${b64}`;
+        // --- Try 1: Google Imagen (Iterate through possible model IDs) ---
+        const googleModels = ['imagen-3.0-generate-001', 'imagen-3.0-alpha-001'];
+        for (const modelId of googleModels) {
+          try {
+            const payload = { 
+              instances: [{ prompt: googlePrompt }], 
+              parameters: { 
+                sampleCount: 1, 
+                aspectRatio: aspectRatio === '16:9' ? "16:9" : "9:16" 
+              } 
+            };
+            const res = await rmFetchWithRetry(
+              `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predict`,
+              { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+              if (b64) {
+                console.log(`[ReelMaker] ✅ Premium image generated with ${modelId}`);
+                return `data:image/png;base64,${b64}`;
+              }
+            } else {
+              const errTxt = await res.text().catch(() => '');
+              console.warn(`[ReelMaker] ${modelId} returned ${res.status}:`, errTxt.substring(0, 100));
             }
-          }
-          const errBody = await res.text().catch(() => '');
-          console.warn(`[ReelMaker] Imagen 3.0 failed or filtered (${res.status}). Fallback to Pollinations.`, errBody.substring(0, 250));
-        } catch (e) { console.warn('[ReelMaker] Imagen error:', e.message); }
+          } catch (e) { console.warn(`[ReelMaker] ${modelId} error:`, e.message); }
+        }
 
-        // --- Try 2: Pollinations.ai (FREE, no API key needed) ---
-        let pollinationsError = "";
+        // --- Try 2: Pollinations.ai (FREE fallback) ---
+        // SMART FIX: Pollinations fails if the prompt is a long sentence. We extract only key visual nouns/adjectives.
         try {
-          console.log('[ReelMaker] Using Pollinations.ai (free fallback)...');
-          setMsg('Generating image via free AI service...'); setMsg('Generating image via free AI service...');
+          console.log('[ReelMaker] Using Smart Fallback (Pollinations.ai)...');
+          setMsg('Generating image via smart fallback...');
           
-          // 1. Shorten prompt 
-          // 2. Strip ALL special characters (slashes, quotes, newlines) because 
-          // Pollinations URL path router throws 404 if it sees encoded slashes (%2F)
-          const shortPrompt = enhancedPrompt
-            .substring(0, 800)
-            .replace(/[^a-zA-Z0-9\s,.-]/g, ' ') // Only keep safe characters
-            .replace(/\s+/g, ' ') // Remove extra spaces
-            .trim();
+          const cleanTags = prompt
+            .replace(/[^\w\s,]/g, ' ') 
+            .replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 400);
             
-          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(shortPrompt)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+          const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTags)}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
           
           const res = await fetch(pollinationsUrl);
           if (res.ok) {
