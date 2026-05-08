@@ -526,11 +526,11 @@
               }
               
               ctx.fillStyle = 'rgba(0,0,0,0.7)';
-              const boxHeight = canvas.height * 0.15, boxY = canvas.height - boxHeight - (canvas.height * 0.08);
+              const boxHeight = canvas.height * 0.12, boxY = canvas.height - boxHeight - (canvas.height * 0.06);
               ctx.fillRect(canvas.width * 0.05, boxY, canvas.width * 0.9, boxHeight);
               
               ctx.fillStyle = 'white'; 
-              const fontSize = Math.floor(canvas.width * 0.06);
+              const fontSize = Math.floor(canvas.width * 0.045);
               ctx.font = `bold ${fontSize}px Tajawal, Cairo, sans-serif`; 
               ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
               ctx.direction = targetLang === 'ar' ? 'rtl' : 'ltr';
@@ -585,8 +585,8 @@
             <div className="absolute inset-0 flex items-end justify-center p-6 pb-12 z-10 pointer-events-none">
               {scenes.map((scene, index) => (
                 <div key={`text-${index}`} className={`absolute w-full transition-all duration-300 transform ${index === currentScene ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                  <div className="bg-black/70 backdrop-blur-md px-6 py-5 rounded-2xl border border-white/10 shadow-2xl mx-4">
-                    <h2 className="text-2xl md:text-3xl font-black text-white text-center leading-relaxed" dir={targetLang === 'ar' ? 'rtl' : 'ltr'} style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}>{scene.narration}</h2>
+                  <div className="bg-black/70 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 shadow-2xl mx-4">
+                    <h2 className="text-lg md:text-xl font-bold text-white text-center leading-relaxed" dir={targetLang === 'ar' ? 'rtl' : 'ltr'} style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}>{scene.narration}</h2>
                   </div>
                 </div>
               ))}
@@ -661,10 +661,10 @@
 
       const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en') => {
         const langInstruction = lang === 'ar'
-          ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى). DO NOT use any local dialects."
+          ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى) WITH full diacritics (التشكيل الكامل) for every word."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly 6 consecutive scenes. The first 5 scenes should cover the content. The 6th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. (Short, punchy, max 8 words. Avoid quotes inside it).\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}\nCreate exactly 6 consecutive scenes. The first 5 scenes should cover the content. The 6th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). Avoid quotes inside it.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene (e.g., 'car', 'sunset', 'office', 'coffee').\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
