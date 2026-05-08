@@ -667,7 +667,7 @@
           ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى) WITH full diacritics (التشكيل الكامل) for every word."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly ${targetSceneCount} consecutive scenes. The first ${targetSceneCount - 1} scenes should cover the content. The ${targetSceneCount}th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nCRITICAL: The script must flow continuously like a cohesive story or narrative from scene 1 to scene ${targetSceneCount}. Do NOT make them sound like disconnected, scattered facts.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). Avoid quotes inside it. Ensure smooth transitions from the previous scene.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene.\nReturn ONLY a strictly valid JSON object without markdown formatting, no trailing commas, and properly escaped quotes: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}\nCreate exactly ${targetSceneCount} consecutive scenes. The first ${targetSceneCount - 1} scenes should cover the content. The ${targetSceneCount}th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nCRITICAL: The script must flow continuously like a cohesive story or narrative from scene 1 to scene ${targetSceneCount}. Do NOT make them sound like disconnected, scattered facts.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). DO NOT use double quotes (") inside the text; use single quotes (') if needed. Ensure smooth transitions from the previous scene.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene.\nReturn ONLY a strictly valid JSON object: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
@@ -683,8 +683,19 @@
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${workingModel}:generateContent?`;
         const data = await safeGeminiFetch(url, payload);
         let text = data.candidates[0].content.parts[0].text;
+        
+        // Smart JSON Cleaning
         text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        return JSON.parse(text).scenes;
+        // Remove trailing commas that break JSON.parse in many environments
+        text = text.replace(/,\s*([}\]])/g, '$1');
+        
+        try {
+          const parsed = JSON.parse(text);
+          return parsed.scenes;
+        } catch (e) {
+          console.error("[ReelMaker] JSON Parse Error. Raw Text:", text);
+          throw new Error("The AI returned an invalid script format. Please try generating again.");
+        }
       };
 
       // Helper: wait with rate-limit-aware retry
