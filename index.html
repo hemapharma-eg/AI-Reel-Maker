@@ -418,150 +418,131 @@
         let audioCtx = null;
         try {
           const canvas = document.createElement('canvas');
-          const isWide = targetLang === 'ar' ? false : (window.ReelAspectRatio === '16:9'); // Global or passed aspect ratio
-          // We need to access the aspect ratio. Let's assume it's passed or available.
-          // Since I can't easily change the prop signature without updating all calls, 
-          // I'll look at the props of RMRecreatedPlayer.
-          // It doesn't have it. I should add it.
-          
           canvas.width = window.exportW || 720; 
           canvas.height = window.exportH || 1280;
+          const ctx = canvas.getContext('2d', { alpha: false });
           
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
           let stream;
-          try { stream = canvas.captureStream(30); } catch (e) { throw new Error("Your browser does not support video rendering."); }
+          try { stream = canvas.captureStream(30); } catch (e) { throw new Error("Browser rendering not supported."); }
+          
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
           await audioCtx.resume();
           const dest = audioCtx.createMediaStreamDestination();
-          const tracks = [...stream.getVideoTracks()];
-          if (dest.stream.getAudioTracks().length > 0) tracks.push(dest.stream.getAudioTracks()[0]);
-          const combinedStream = new MediaStream(tracks);
-          const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-          let mimeType = '';
-          if (isSafari && MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
-          else if (MediaRecorder.isTypeSupported('video/webm; codecs=vp8')) mimeType = 'video/webm; codecs=vp8';
-          else if (MediaRecorder.isTypeSupported('video/webm')) mimeType = 'video/webm';
-          if (!mimeType) throw new Error("No supported video codec found.");
-          const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 8000000 });
+          
+          const recorder = new MediaRecorder(new MediaStream([...stream.getVideoTracks(), ...dest.stream.getAudioTracks()]), { 
+            mimeType: MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm', 
+            videoBitsPerSecond: 8000000 
+          });
+          
           const chunks = [];
-          recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+          recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+          
           const bgAudio = new Audio(selectedBgmId);
-          bgAudio.crossOrigin = "anonymous";
-          bgAudio.loop = true;
+          bgAudio.crossOrigin = "anonymous"; bgAudio.loop = true;
           const bgSource = audioCtx.createMediaElementSource(bgAudio);
           const bgGain = audioCtx.createGain();
           bgGain.gain.value = bgmVolume / 100;
-          bgSource.connect(bgGain);
-          bgGain.connect(dest);
-          bgAudio.play().catch(e => console.warn("BGM Export play failed:", e));
+          bgSource.connect(bgGain); bgGain.connect(dest);
           
           let particles = [];
           if (visualEffect === 'snow') particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 4 + 1, speed: Math.random() * 3 + 1, opacity: Math.random() * 0.4 + 0.1, type: 'snow' }));
           else if (visualEffect === 'rain') particles = Array.from({length: 100}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, length: Math.random() * 20 + 10, speed: Math.random() * 10 + 15, opacity: Math.random() * 0.3 + 0.1, type: 'rain' }));
-          else if (visualEffect === 'confetti') particles = Array.from({length: 80}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 8 + 4, speed: Math.random() * 4 + 2, color: `hsl(${Math.random()*360}, 100%, 50%)`, rot: Math.random()*360, type: 'confetti' }));
-          else if (visualEffect === 'stars') particles = Array.from({length: 60}, () => ({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 3 + 1, opacity: Math.random(), type: 'stars', twinkleSpeed: Math.random() * 0.05 + 0.01 }));
           
           recorder.start();
+          bgAudio.play().catch(() => {});
 
           for (let i = 0; i < scenes.length; i++) {
             const scene = scenes[i];
-            setExportProgress(Math.round(((i) / scenes.length) * 100));
+            setExportProgress(Math.round((i / scenes.length) * 100));
             
             const img = new Image(); img.crossOrigin = 'anonymous';
-            await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = scene.imageUrl; });
+            await new Promise((res) => { img.onload = res; img.onerror = res; img.src = scene.imageUrl; });
             
-            let isScenePlaying = true; 
-            let source = null;
-            let audioTimeout = null;
+            // Fallback for failed image
+            if (!img.width) { ctx.fillStyle = 'black'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+
+            let sceneStartTime = performance.now();
+            let audioEnded = false;
+            let audioDuration = 4000;
 
             if (scene.audioUrl) {
-              const audio = new Audio(scene.audioUrl); audio.crossOrigin = "anonymous";
-              source = audioCtx.createMediaElementSource(audio);
+              const audio = new Audio(scene.audioUrl);
+              audio.crossOrigin = "anonymous";
+              const source = audioCtx.createMediaElementSource(audio);
               const voiceGain = audioCtx.createGain();
               voiceGain.gain.value = voiceVolume / 100;
-              source.connect(voiceGain);
-              voiceGain.connect(dest);
+              source.connect(voiceGain); voiceGain.connect(dest);
               
-              const finishScene = () => { isScenePlaying = false; if (audioTimeout) clearTimeout(audioTimeout); };
-              audio.onended = finishScene; 
-              audio.onerror = finishScene;
-              
-              // Safety timeout: if audio is 10s, but hangs, we break at 15s
-              audioTimeout = setTimeout(finishScene, 15000); 
+              await new Promise(r => {
+                audio.onloadedmetadata = () => { audioDuration = audio.duration * 1000; r(); };
+                audio.onerror = r;
+                setTimeout(r, 2000); // safety
+              });
 
-              await audio.play().catch(() => { isScenePlaying = false; });
-            } else { 
-              setTimeout(() => { isScenePlaying = false; }, 4000); 
+              audio.onended = () => { audioEnded = true; };
+              await audio.play().catch(() => { audioEnded = true; });
+            } else {
+              audioEnded = true; // wait for timer
             }
 
-            const startTime = performance.now();
-            while (isScenePlaying || (performance.now() - startTime < 4000)) {
-              if (performance.now() - startTime > 20000) { isScenePlaying = false; break; } // Hard limit 20s per scene
-              const elapsed = performance.now() - startTime;
+            const MIN_SCENE_TIME = audioDuration;
+            
+            while (!audioEnded || (performance.now() - sceneStartTime < MIN_SCENE_TIME)) {
+              const elapsed = performance.now() - sceneStartTime;
+              if (elapsed > 30000) break; // Safety break
+
+              const zoom = 1 + (elapsed / 10000) * 0.1;
+              const baseScale = Math.max(canvas.width / (img.width || 1), canvas.height / (img.height || 1));
+              const scale = baseScale * zoom;
               
-              const zoom = 1 + (elapsed / 5000) * 0.15; 
-              const imgScale = Math.max(canvas.width / img.width, canvas.height / img.height) * zoom;
+              let x = (canvas.width / 2) - ((img.width || canvas.width) / 2) * scale;
+              let y = (canvas.height / 2) - ((img.height || canvas.height) / 2) * scale;
               
-              let x = (canvas.width / 2) - (img.width / 2) * imgScale;
-              let y = (canvas.height / 2) - (img.height / 2) * imgScale;
-              
-              if (scene.animType === 'panLeft') x += ((elapsed / 5000) * (canvas.width * 0.1));
-              else x -= ((elapsed / 5000) * (canvas.width * 0.1));
+              if (scene.animType === 'panLeft') x += (elapsed / 10000) * (canvas.width * 0.05);
+              else x -= (elapsed / 10000) * (canvas.width * 0.05);
 
               ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, x, y, img.width * imgScale, img.height * imgScale);
-              ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+              if (img.width) ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+              ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
               
-              if (visualEffect !== 'none') {
-                particles.forEach(p => { 
-                  if (p.type === 'snow') {
-                    p.y -= p.speed; if (p.y < 0) p.y = canvas.height; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${p.opacity})`; ctx.fill(); 
-                  } else if (p.type === 'rain') {
-                    p.y += p.speed; if (p.y > canvas.height) p.y = 0; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 2, p.y + p.length); ctx.strokeStyle = `rgba(200,220,255,${p.opacity})`; ctx.lineWidth = 2; ctx.stroke();
-                  } else if (p.type === 'confetti') {
-                    p.y += p.speed; p.rot += 5; if (p.y > canvas.height) p.y = 0; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180); ctx.fillStyle = p.color; ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); ctx.restore();
-                  } else if (p.type === 'stars') {
-                    p.opacity += p.twinkleSpeed; if (p.opacity > 1 || p.opacity < 0) p.twinkleSpeed *= -1; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(255,255,255,${Math.abs(p.opacity)})`; ctx.fill();
-                  }
-                });
-              }
-              
-              ctx.fillStyle = 'rgba(0,0,0,0.7)';
-              const boxHeight = canvas.height * 0.10, boxY = canvas.height - boxHeight - (canvas.height * 0.05);
-              ctx.fillRect(canvas.width * 0.05, boxY, canvas.width * 0.9, boxHeight);
-              
-              ctx.fillStyle = 'white'; 
-              const fontSize = Math.floor(canvas.width * 0.035);
-              ctx.font = `bold ${fontSize}px Tajawal, Cairo, sans-serif`; 
+              // Effects
+              particles.forEach(p => {
+                p.y += p.speed; if (p.y > canvas.height) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size || 2, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(255,255,255,${p.opacity || 0.5})`; ctx.fill();
+              });
+
+              // Text
+              const boxH = canvas.height * 0.12, boxY = canvas.height * 0.8;
+              ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(canvas.width*0.05, boxY, canvas.width*0.9, boxH);
+              ctx.fillStyle = 'white'; ctx.font = `bold ${Math.floor(canvas.width*0.04)}px Tajawal, sans-serif`;
               ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-              ctx.direction = targetLang === 'ar' ? 'rtl' : 'ltr';
               
-              const words = scene.narration.split(' '); let line = ''; const lines = [];
-              for (let n = 0; n < words.length; n++) { const testLine = line + words[n] + ' '; if (ctx.measureText(testLine).width > canvas.width * 0.8 && n > 0) { lines.push(line); line = words[n] + ' '; } else { line = testLine; } }
+              const words = scene.narration.split(' '); let line = '', lines = [];
+              for(let w of words) { 
+                if (ctx.measureText(line + w).width > canvas.width*0.8) { lines.push(line); line = w + ' '; }
+                else line += w + ' ';
+              }
               lines.push(line);
-              
-              const lineHeight = fontSize + 10, startY = boxY + (boxHeight / 2) - ((lines.length - 1) * lineHeight) / 2;
-              lines.forEach((l, i) => { ctx.fillText(l.trim(), canvas.width / 2, startY + (i * lineHeight)); });
-              
+              lines.forEach((l, idx) => ctx.fillText(l.trim(), canvas.width/2, boxY + (boxH/(lines.length+1))*(idx+1)));
+
               await new Promise(r => setTimeout(r, 1000/30));
             }
-            if (source) source.disconnect();
           }
           
           setExportProgress(100);
           bgAudio.pause();
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise(r => setTimeout(r, 1000));
           recorder.stop();
           await new Promise(r => recorder.onstop = r);
-          const blob = new Blob(chunks, { type: mimeType });
+          
+          const blob = new Blob(chunks, { type: recorder.mimeType });
           const url = URL.createObjectURL(blob);
           setExportedVideoUrl(url);
-          const a = document.createElement('a'); a.href = url;
-          a.download = `ReMaker_Video_${Date.now()}.webm`;
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        } catch (err) { console.error("Export failed:", err); alert("Export Error: " + err.message); }
-        finally { setIsExporting(false); if (audioCtx && audioCtx.state !== 'closed') audioCtx.close(); }
+          const a = document.createElement('a'); a.href = url; a.download = `ReMaker_${Date.now()}.mp4`;
+          a.click();
+        } catch (err) { alert("Export Error: " + err.message); }
+        finally { setIsExporting(false); if (audioCtx) audioCtx.close(); }
       };
 
       const AlertCircleIcon = getSafeIcon('AlertCircle') || getSafeIcon('X');
@@ -662,12 +643,25 @@
 
       const getTargetLanguage = () => { const voice = GLOBAL_VOICE_OPTIONS.find(v => v.id === selectedVoice); return voice ? voice.lang : 'en'; };
 
-      const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en', targetSceneCount = 6) => {
+      const generateRecreationScript = async (frames, youtubeUrl = null, textPrompt = null, lang = 'en', targetSceneCount = 10) => {
         const langInstruction = lang === 'ar'
           ? "IMPORTANT: The script MUST be written in Modern Standard Arabic (لغة عربية فصحى) WITH full diacritics (التشكيل الكامل) for every word."
           : "IMPORTANT: The script MUST be written in engaging, modern English.";
         let prompt = "", payload = {};
-        const sceneInstruction = `${langInstruction}\nCreate exactly ${targetSceneCount} consecutive scenes. The first ${targetSceneCount - 1} scenes should cover the content. The ${targetSceneCount}th and final scene MUST be an outro asking the viewer to like the video and subscribe to the channel/page.\nCRITICAL: The script must flow continuously like a cohesive story or narrative from scene 1 to scene ${targetSceneCount}. Do NOT make them sound like disconnected, scattered facts.\nFor each scene, provide:\n1. 'narration': The text hook/voiceover. Must be at least one complete, engaging sentence (10-20 words). DO NOT use double quotes (") inside the text; use single quotes (') if needed. Ensure smooth transitions from the previous scene.\n2. 'image_prompt': A highly detailed prompt in English to generate a cinematic, 3D, photorealistic B-roll image.\n3. 'search_query': 1 or 2 simple keywords in English that represent the main subject of the scene.\nReturn ONLY a strictly valid JSON object: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
+        const sceneInstruction = `${langInstruction}
+Create exactly ${targetSceneCount} consecutive scenes. 
+CRITICAL FOR RETENTION: 
+1. The first scene MUST be a powerful 'pattern-interrupt' hook that grabs attention in the first 2 seconds.
+2. Every scene must lead into the next using 'open loops' or curiosity gaps.
+3. The narrative must be fast-paced, emotional, and highly engaging.
+4. The final scene MUST be an energetic call-to-action (CTA) to like and subscribe.
+
+For each scene, provide:
+1. 'narration': The voiceover text. Must be exactly 3 to 4 complete, punchy sentences (35-60 words total). Use high-energy language. DO NOT use double quotes (") inside the text; use single quotes (') if needed.
+2. 'image_prompt': A highly detailed prompt in English for a cinematic, hyper-realistic, or stylized artistic visual that perfectly matches the high-energy narration.
+3. 'search_query': 1 or 2 simple keywords in English for the scene's subject.
+
+Return ONLY a strictly valid JSON object: { "scenes": [ { "narration": "Text", "image_prompt": "Prompt", "search_query": "Keyword" } ] }`;
 
         if (textPrompt) {
           prompt = `The user wants to create a highly engaging, faceless viral Reel/TikTok based on this topic: "${textPrompt}". Create a completely new script.\n${sceneInstruction}`;
@@ -906,11 +900,10 @@
           let scenes = [];
           const targetLang = getTargetLanguage();
           
-          let targetCount = 6;
-          if (aspectRatio === '16:9') {
-            const [min, max] = sceneCountRange.split('-').map(Number);
-            targetCount = Math.floor((min + max) / 2); 
-          }
+          let targetCount = 10;
+          const [min, max] = sceneCountRange.split('-').map(Number);
+          targetCount = Math.floor((min + max) / 2); 
+          if (isNaN(targetCount)) targetCount = 10;
 
           if (mode === 'prompt') { 
             setMsg('Brainstorming & writing script from prompt...'); 
